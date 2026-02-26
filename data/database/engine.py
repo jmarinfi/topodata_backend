@@ -1,5 +1,6 @@
-from typing import Generator
+from typing import Annotated, Generator
 
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -14,8 +15,9 @@ SessionLocal = sessionmaker(
 
 def get_db() -> Generator[Session, None, None]:
     """Generador de sesiones de base de datos."""
-    db = SessionLocal()
-    try:
+    with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
+
+
+# Alias reutilizable para inyectar en routers y factories
+SessionDep = Annotated[Session, Depends(get_db)]
