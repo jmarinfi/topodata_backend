@@ -1,9 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import project_router
+from data.database import engine, init_db
 
-app = FastAPI(title="TopoData API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+    engine.dispose()
+
+
+app = FastAPI(title="TopoData API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,3 +25,8 @@ app.add_middleware(
 )
 
 app.include_router(project_router)
+
+
+@app.get("/")
+async def root():
+    return {"message": "¡Bienvenido a la API de TopoData!"}
