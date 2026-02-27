@@ -14,6 +14,8 @@ class ProjectService:
 
     def get_project(self, project_id: int) -> ProjectResponse:
         project = self.repository.get(project_id)
+        if not project:
+            raise ValueError(f"Proyecto con id {project_id} no encontrado.")
         return ProjectResponse.model_validate(project)
 
     def get_number_projects(self) -> int:
@@ -28,8 +30,8 @@ class ProjectService:
     def create_project(self, project_data: ProjectCreate) -> ProjectResponse:
         attributes = project_data.model_dump()
         project = self.repository.create(attributes)
-        self.repository.session.commit()
-        self.repository.session.refresh(project)
+        self.repository.commit()
+        self.repository.refresh(project)
         return ProjectResponse.model_validate(project)
 
     def update_project(
@@ -40,8 +42,8 @@ class ProjectService:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
         attributes = project_data.model_dump()
         project = self.repository.update(db_project, attributes)
-        self.repository.session.commit()
-        self.repository.session.refresh(project)
+        self.repository.commit()
+        self.repository.refresh(project)
         return ProjectResponse.model_validate(project)
 
     def delete_project(self, project_id: int) -> None:
@@ -49,4 +51,4 @@ class ProjectService:
         if not db_project:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
         self.repository.delete(db_project)
-        self.repository.session.commit()
+        self.repository.commit()
