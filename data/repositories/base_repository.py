@@ -47,8 +47,5 @@ class BaseRepository(Generic[ModelType]):
         self._session.delete(db_obj)
         self._session.flush()
 
-    def commit(self) -> None:
-        self._session.commit()
-
     def refresh(self, db_obj: ModelType) -> None:
         self._session.refresh(db_obj)

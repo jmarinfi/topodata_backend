@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import project_router
+from api.routes import project_router, import_session_router
 from data.database import engine, init_db
 
 
@@ -25,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(project_router)
+app.include_router(import_session_router)
 
 
 @app.get("/")

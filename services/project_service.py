@@ -30,7 +30,6 @@ class ProjectService:
     def create_project(self, project_data: ProjectCreate) -> ProjectResponse:
         attributes = project_data.model_dump()
         project = self.repository.create(attributes)
-        self.repository.commit()
         self.repository.refresh(project)
         return ProjectResponse.model_validate(project)
 
@@ -42,7 +41,6 @@ class ProjectService:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
         attributes = project_data.model_dump()
         project = self.repository.update(db_project, attributes)
-        self.repository.commit()
         self.repository.refresh(project)
         return ProjectResponse.model_validate(project)
 
@@ -51,4 +49,3 @@ class ProjectService:
         if not db_project:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
         self.repository.delete(db_project)
-        self.repository.commit()
