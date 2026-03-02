@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from api.dependencies import ImportSessionServiceDep
 from api.schemas import ImportSessionCreate, ImportSessionResponse, ImportSessionUpdate
 
-router = APIRouter(prefix="/api/v1/import_sessions", tags=["import_sessions"])
+router = APIRouter(prefix="/api/v1/import-sessions", tags=["import_sessions"])
 
 
 @router.get("/", response_model=list[ImportSessionResponse])

@@ -9,3 +9,6 @@ dependencies = [
     "fastapi[standard]>=0.133.1",
     "sqlalchemy>=2.0.47",
 ]
+
+[tool.ruff.lint]
+ignore = ["RUF032"]
