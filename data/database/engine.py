@@ -16,10 +16,10 @@ SessionLocal = sessionmaker(
 
 def init_db() -> None:
     """Crea todas las tablas definidas en los modelos si no existen."""
-    from data.database.models import Base
+    # from data.database.models import Base
 
     Path("sqlite_database").mkdir(exist_ok=True)
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
