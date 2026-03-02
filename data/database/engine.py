@@ -25,7 +25,12 @@ def init_db() -> None:
 def get_db() -> Generator[Session, None, None]:
     """Generador de sesiones de base de datos."""
     with SessionLocal() as db:
-        yield db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
 
 # Alias reutilizable para inyectar en routers y factories
