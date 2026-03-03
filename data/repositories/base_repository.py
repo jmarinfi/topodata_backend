@@ -1,6 +1,7 @@
 from typing import Any, Generic, Optional, Sequence, TypeVar
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from data.database.models.base import Base
@@ -30,17 +31,27 @@ class BaseRepository(Generic[ModelType]):
 
     def create(self, attributes: dict[str, Any]) -> ModelType:
         """Crea un nuevo registro a partir de un diccionario de atributos."""
-        db_obj = self.model(**attributes)
-        self._session.add(db_obj)
-        self._session.flush()
-        return db_obj
+        try:
+            db_obj = self.model(**attributes)
+            self._session.add(db_obj)
+            self._session.flush()
+            return db_obj
+        except IntegrityError as e:
+            raise ValueError(
+                "No se pudo crear el registro de tipo debido a un conflicto de datos"
+            ) from e
 
     def update(self, db_obj: ModelType, attributes: dict[str, Any]) -> ModelType:
         """Actualiza un registro existente con nuevos atributos."""
-        for key, value in attributes.items():
-            setattr(db_obj, key, value)
-        self._session.flush()
-        return db_obj
+        try:
+            for key, value in attributes.items():
+                setattr(db_obj, key, value)
+            self._session.flush()
+            return db_obj
+        except IntegrityError as e:
+            raise ValueError(
+                "No se pudo actualizar el registro debido a un conflicto de datos"
+            ) from e
 
     def delete(self, db_obj: ModelType) -> None:
         """Elimina un registro."""

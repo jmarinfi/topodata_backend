@@ -1,7 +1,5 @@
-from sqlalchemy.exc import IntegrityError
-
 from api.schemas import StationSetupCreate, StationSetupResponse, StationSetupUpdate
-from data.repositories import StationSetupRepository, ImportSessionRepository
+from data.repositories import ImportSessionRepository, StationSetupRepository
 
 
 class StationSetupService:
@@ -45,24 +43,18 @@ class StationSetupService:
     def create_station_setup(
         self, station_setup_data: StationSetupCreate
     ) -> StationSetupResponse:
-        try:
-            import_session = self.repository_import_session.get(
-                station_setup_data.import_session_id
-            )
-            if not import_session:
-                raise ValueError(
-                    f"Sesión de importación con id {station_setup_data.import_session_id} no encontrada."
-                )
-
-            attributes = station_setup_data.model_dump()
-            station_setup = self.repository.create(attributes)
-            self.repository.refresh(station_setup)
-            return StationSetupResponse.model_validate(station_setup)
-
-        except IntegrityError:
+        import_session = self.repository_import_session.get(
+            station_setup_data.import_session_id
+        )
+        if not import_session:
             raise ValueError(
-                "No se pudo crear el estacionamiento debido a un error de integridad inesperado."
+                f"Sesión de importación con id {station_setup_data.import_session_id} no encontrada."
             )
+
+        attributes = station_setup_data.model_dump()
+        station_setup = self.repository.create(attributes)
+        self.repository.refresh(station_setup)
+        return StationSetupResponse.model_validate(station_setup)
 
     def update_station_setup(
         self, station_setup_id: int, station_setup_data: StationSetupUpdate
