@@ -7,7 +7,9 @@ class StationSetupBase(BaseModel):
     """Esquema base para los estacionamientos."""
 
     import_session_id: int = Field(..., description="Id de la sesión de importación")
-    station_name: str = Field(..., description="Nombre del estacionamiento")
+    station_name: str = Field(
+        ..., max_length=255, description="Nombre del estacionamiento"
+    )
     station_height: float | None = Field(None, description="Altura del estacionamiento")
     edm_refractive_index: float | None = Field(
         None, description="Índice de refracción EDM"
@@ -45,7 +47,7 @@ class StationSetupUpdate(StationSetupBase):
 class StationSetupResponse(StationSetupBase):
     """Esquema para obtener estacionamientos de la base de datos."""
 
-    id: int
+    id: int = Field(..., description="Id del estacionamiento")
     etr_x: float | None = Field(None, description="Coordenada X del estacionamiento")
     etr_y: float | None = Field(None, description="Coordenada Y del estacionamiento")
     etr_z: float | None = Field(None, description="Coordenada Z del estacionamiento")
