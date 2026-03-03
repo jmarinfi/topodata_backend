@@ -1,3 +1,8 @@
+from api.schemas.bessel_observation_schemas import (
+    BesselObservationCreate,
+    BesselObservationResponse,
+    BesselObservationUpdate,
+)
 from api.schemas.import_session_schemas import (
     ImportSessionCreate,
     ImportSessionResponse,
@@ -28,4 +33,7 @@ __all__ = [
     "RawObservationCreate",
     "RawObservationResponse",
     "RawObservationUpdate",
+    "BesselObservationCreate",
+    "BesselObservationResponse",
+    "BesselObservationUpdate",
 ]
