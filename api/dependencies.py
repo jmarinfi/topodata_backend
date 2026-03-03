@@ -6,9 +6,15 @@ from data.database import SessionDep
 from data.repositories import (
     ImportSessionRepository,
     ProjectRepository,
+    RawObservationRepository,
     StationSetupRepository,
 )
-from services import ImportSessionService, ProjectService, StationSetupService
+from services import (
+    ImportSessionService,
+    ProjectService,
+    RawObservationService,
+    StationSetupService,
+)
 
 
 def get_project_repository(db: SessionDep) -> ProjectRepository:
@@ -64,4 +70,26 @@ def get_station_setup_service(
 
 StationSetupServiceDep = Annotated[
     StationSetupService, Depends(get_station_setup_service)
+]
+
+
+def get_raw_observation_repository(db: SessionDep) -> RawObservationRepository:
+    return RawObservationRepository(session=db)
+
+
+RawObservationRepositoryDep = Annotated[
+    RawObservationRepository, Depends(get_raw_observation_repository)
+]
+
+
+def get_raw_observation_service(
+    repo: RawObservationRepositoryDep, station_setup_repo: StationSetupRepositoryDep
+) -> RawObservationService:
+    return RawObservationService(
+        repository=repo, repository_station_setup=station_setup_repo
+    )
+
+
+RawObservationServiceDep = Annotated[
+    RawObservationService, Depends(get_raw_observation_service)
 ]
