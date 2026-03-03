@@ -14,10 +14,9 @@ class ImportSessionRepository(BaseRepository[ImportSession]):
         super().__init__(model=ImportSession, session=session)
 
     def get_by_project(self, project_id: int) -> Sequence[ImportSession]:
-        result = self._session.execute(
+        return self._session.scalars(
             select(ImportSession).where(ImportSession.project_id == project_id)
-        )
-        return result.scalars().all()
+        ).all()
 
     def get_by_project_and_hash(
         self, project_id: int, content_hash: str
