@@ -4,12 +4,14 @@ from fastapi import Depends
 
 from data.database import SessionDep
 from data.repositories import (
+    BesselObservationRepository,
     ImportSessionRepository,
     ProjectRepository,
     RawObservationRepository,
     StationSetupRepository,
 )
 from services import (
+    BesselObservationService,
     ImportSessionService,
     ProjectService,
     RawObservationService,
@@ -92,4 +94,26 @@ def get_raw_observation_service(
 
 RawObservationServiceDep = Annotated[
     RawObservationService, Depends(get_raw_observation_service)
+]
+
+
+def get_bessel_observation_repository(db: SessionDep) -> BesselObservationRepository:
+    return BesselObservationRepository(session=db)
+
+
+BesselObservationRepositoryDep = Annotated[
+    BesselObservationRepository, Depends(get_bessel_observation_repository)
+]
+
+
+def get_bessel_observation_service(
+    repo: BesselObservationRepositoryDep, station_setup_repo: StationSetupRepositoryDep
+) -> BesselObservationService:
+    return BesselObservationService(
+        repository=repo, repository_station_setup=station_setup_repo
+    )
+
+
+BesselObservationServiceDep = Annotated[
+    BesselObservationService, Depends(get_bessel_observation_service)
 ]

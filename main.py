@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import (
+    bessel_observation_router,
     import_session_router,
     project_router,
     raw_observation_router,
@@ -33,6 +34,7 @@ app.include_router(project_router)
 app.include_router(import_session_router)
 app.include_router(station_setup_router)
 app.include_router(raw_observation_router)
+app.include_router(bessel_observation_router)
 
 
 @app.get("/")

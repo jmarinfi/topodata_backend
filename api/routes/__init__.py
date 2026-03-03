@@ -1,3 +1,4 @@
+from api.routes.bessel_observation_router import router as bessel_observation_router
 from api.routes.import_session_router import router as import_session_router
 from api.routes.project_router import router as project_router
 from api.routes.raw_observation_router import router as raw_observation_router
@@ -8,4 +9,5 @@ __all__ = [
     "import_session_router",
     "station_setup_router",
     "raw_observation_router",
+    "bessel_observation_router",
 ]
