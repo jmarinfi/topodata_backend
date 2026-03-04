@@ -4,17 +4,21 @@ from fastapi import Depends
 
 from data.database import SessionDep
 from data.repositories import (
+    ApproximateCoordinateRepository,
     BesselObservationRepository,
     ImportSessionRepository,
     ProjectRepository,
     RawObservationRepository,
+    ReferenceCoordinateRepository,
     StationSetupRepository,
 )
 from services import (
+    ApproximateCoordinateService,
     BesselObservationService,
     ImportSessionService,
     ProjectService,
     RawObservationService,
+    ReferenceCoordinateService,
     StationSetupService,
 )
 
@@ -116,4 +120,51 @@ def get_bessel_observation_service(
 
 BesselObservationServiceDep = Annotated[
     BesselObservationService, Depends(get_bessel_observation_service)
+]
+
+
+def get_reference_coordinate_repository(
+    db: SessionDep,
+) -> ReferenceCoordinateRepository:
+    return ReferenceCoordinateRepository(session=db)
+
+
+ReferenceCoordinateRepositoryDep = Annotated[
+    ReferenceCoordinateRepository, Depends(get_reference_coordinate_repository)
+]
+
+
+def get_reference_coordinate_service(
+    repo: ReferenceCoordinateRepositoryDep, project_repo: ProjectRepositoryDep
+):
+    return ReferenceCoordinateService(repository=repo, repository_project=project_repo)
+
+
+ReferenceCoordinateServiceDep = Annotated[
+    ReferenceCoordinateService, Depends(get_reference_coordinate_service)
+]
+
+
+def get_approximate_coordinate_repository(
+    db: SessionDep,
+) -> ApproximateCoordinateRepository:
+    return ApproximateCoordinateRepository(session=db)
+
+
+ApproximateCoordinateRepositoryDep = Annotated[
+    ApproximateCoordinateRepository, Depends(get_approximate_coordinate_repository)
+]
+
+
+def get_approximate_coordinate_service(
+    repo: ApproximateCoordinateRepositoryDep,
+    bessel_observation_repo: BesselObservationRepositoryDep,
+) -> ApproximateCoordinateService:
+    return ApproximateCoordinateService(
+        repository=repo, repository_bessel_observation=bessel_observation_repo
+    )
+
+
+ApproximateCoordinateServiceDep = Annotated[
+    ApproximateCoordinateService, Depends(get_approximate_coordinate_service)
 ]
