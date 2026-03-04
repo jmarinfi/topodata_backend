@@ -4,10 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import (
+    approximate_coordinate_router,
     bessel_observation_router,
     import_session_router,
     project_router,
     raw_observation_router,
+    reference_coordinate_router,
     station_setup_router,
 )
 from data.database import engine, init_db
@@ -35,6 +37,8 @@ app.include_router(import_session_router)
 app.include_router(station_setup_router)
 app.include_router(raw_observation_router)
 app.include_router(bessel_observation_router)
+app.include_router(reference_coordinate_router)
+app.include_router(approximate_coordinate_router)
 
 
 @app.get("/")

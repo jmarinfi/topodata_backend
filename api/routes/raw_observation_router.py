@@ -7,7 +7,7 @@ from api.schemas import (
     RawObservationUpdate,
 )
 
-router = APIRouter(prefix="/api/v1/raw-observations", tags=["raw_observations"])
+router = APIRouter(prefix="/api/v1/raw-observations", tags=["raw-observations"])
 
 
 @router.get("/", response_model=list[RawObservationResponse])

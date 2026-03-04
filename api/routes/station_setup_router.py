@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from api.dependencies import StationSetupServiceDep
 from api.schemas import StationSetupCreate, StationSetupResponse, StationSetupUpdate
 
-router = APIRouter(prefix="/api/v1/station-setups", tags=["station_setups"])
+router = APIRouter(prefix="/api/v1/station-setups", tags=["station-setups"])
 
 
 @router.get("/", response_model=list[StationSetupResponse])

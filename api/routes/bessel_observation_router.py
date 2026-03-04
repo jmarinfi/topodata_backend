@@ -7,7 +7,7 @@ from api.schemas import (
     BesselObservationUpdate,
 )
 
-router = APIRouter(prefix="/api/v1/bessel-observations", tags=["bessel_observations"])
+router = APIRouter(prefix="/api/v1/bessel-observations", tags=["bessel-observations"])
 
 
 @router.get("/", response_model=list[BesselObservationResponse])
