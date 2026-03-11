@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class ParserBase(ABC):
@@ -7,6 +8,13 @@ class ParserBase(ABC):
     def __init__(self, file_content: str) -> None:
         self.file_content = file_content
 
+        self._lines: list[str] | None = None
+
     @property
     def lines(self) -> list[str]:
-        return self.file_content.splitlines()
+        if self._lines is None:
+            self._lines = self.file_content.splitlines()
+        return self._lines
+
+    @abstractmethod
+    def parse(self) -> Any: ...

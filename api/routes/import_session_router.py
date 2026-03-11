@@ -33,7 +33,8 @@ def create_import_session(
     import_session_in: ImportSessionCreate, service: ImportSessionServiceDep
 ):
     try:
-        return service.create_import_session(import_session_in)
+        import_session = service.create_import_session(import_session_in)
+        return import_session
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
