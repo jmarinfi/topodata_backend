@@ -15,6 +15,7 @@ from data.repositories import (
 from services import (
     ApproximateCoordinateService,
     BesselObservationService,
+    ImportOrchestratorService,
     ImportSessionService,
     ProjectService,
     RawObservationService,
@@ -167,4 +168,19 @@ def get_approximate_coordinate_service(
 
 ApproximateCoordinateServiceDep = Annotated[
     ApproximateCoordinateService, Depends(get_approximate_coordinate_service)
+]
+
+
+def get_import_orchestrator_service(
+    import_repo: ImportSessionRepositoryDep,
+    station_repo: StationSetupRepositoryDep,
+    obs_repo: RawObservationRepositoryDep,
+) -> ImportOrchestratorService:
+    return ImportOrchestratorService(
+        import_repo=import_repo, station_repo=station_repo, obs_repo=obs_repo
+    )
+
+
+ImportOrchestratorServiceDep = Annotated[
+    ImportOrchestratorService, Depends(get_import_orchestrator_service)
 ]

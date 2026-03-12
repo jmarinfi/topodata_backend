@@ -22,6 +22,7 @@ from api.schemas.import_session_schemas import (
     ImportSessionResponse,
     ImportSessionUpdate,
 )
+from api.schemas.parser_schemas import GkaImportResult
 from api.schemas.project_schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from api.schemas.raw_observaton_schemas import (
     RawObservationCreate,
@@ -56,9 +57,11 @@ __all__ = [
     "ImportSessionResponse",
     "ImportSessionUpdate",
     "StationSetupCreate",
+    "StationSetupParsed",
     "StationSetupResponse",
     "StationSetupUpdate",
     "RawObservationCreate",
+    "RawObservationParsed",
     "RawObservationResponse",
     "RawObservationUpdate",
     "BesselObservationCreate",
@@ -74,4 +77,5 @@ __all__ = [
     "ApproximateCoordinateResponse",
     "ApproximateCoordinateUpdate",
     "AnyCoordinateResponse",
+    "GkaImportResult",
 ]

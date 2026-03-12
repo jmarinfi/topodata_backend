@@ -1,0 +1,15 @@
+from pydantic import BaseModel, ConfigDict
+
+from api.schemas.import_session_schemas import ImportSessionResponse
+from api.schemas.raw_observaton_schemas import RawObservationResponse
+from api.schemas.station_setup_schemas import StationSetupResponse
+
+
+class GkaImportResult(BaseModel):
+    """Esquema para el resultado completo de la importación GKA."""
+
+    import_session: ImportSessionResponse
+    station_setups: list[StationSetupResponse]
+    raw_observations: list[RawObservationResponse]
+
+    model_config = ConfigDict(from_attributes=True)
