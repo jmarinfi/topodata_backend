@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.18.4",
     "fastapi[standard]>=0.133.1",
     "gps-time>=3.0.0",
+    "pandas>=3.0.1",
     "sqlalchemy>=2.0.47",
 ]
 
