@@ -9,6 +9,7 @@ from data.repositories.reference_coordinate_repository import (
     ReferenceCoordinateRepository,
 )
 from data.repositories.station_setup_repository import StationSetupRepository
+from data.repositories.user_repository import UserRepository
 
 __all__ = [
     "ProjectRepository",
@@ -18,4 +19,5 @@ __all__ = [
     "BesselObservationRepository",
     "ApproximateCoordinateRepository",
     "ReferenceCoordinateRepository",
+    "UserRepository",
 ]

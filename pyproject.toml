@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",
+    "bcrypt>=5.0.0",
     "fastapi[standard]>=0.133.1",
     "gps-time>=3.0.0",
     "pandas>=3.0.1",
+    "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
     "sqlalchemy>=2.0.47",
 ]
 
