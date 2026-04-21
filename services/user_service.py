@@ -72,6 +72,9 @@ class UserService:
         if user_data.is_active is not None:
             attributes["is_active"] = user_data.is_active
 
+        if user_data.is_superuser is not None:
+            attributes["is_superuser"] = user_data.is_superuser
+
         user = self.repository.update(db_user, attributes)
         self.repository.refresh(user)
 
@@ -87,7 +90,7 @@ class UserService:
 
     def login(self, credentials: LoginRequest) -> TokenResponse:
         """Valida las credenciales y devuelve un token JWT si son correctos."""
-        user = self.repository.get_by_username(credentials.username)
+        user = self.repository.get_by_email(credentials.email)
 
         if not user or not self.password_service.verify(
             credentials.password, user.hashed_password

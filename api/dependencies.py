@@ -1,7 +1,9 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 
+from api.schemas.user_schemas import UserResponse
 from data.database import SessionDep
 from data.repositories import (
     ApproximateCoordinateRepository,
@@ -11,17 +13,23 @@ from data.repositories import (
     RawObservationRepository,
     ReferenceCoordinateRepository,
     StationSetupRepository,
+    UserRepository,
 )
 from services import (
     ApproximateCoordinateService,
     BesselObservationService,
     ImportOrchestratorService,
     ImportSessionService,
+    PasswordService,
     ProjectService,
     RawObservationService,
     ReferenceCoordinateService,
     StationSetupService,
+    TokenService,
+    UserService,
 )
+
+# --- Projects ---
 
 
 def get_project_repository(db: SessionDep) -> ProjectRepository:
@@ -36,6 +44,9 @@ def get_project_service(repo: ProjectRepositoryDep) -> ProjectService:
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
+
+
+# --- Import Sessions ---
 
 
 def get_import_session_repository(db: SessionDep) -> ImportSessionRepository:
@@ -56,6 +67,9 @@ def get_import_session_service(
 ImportSessionServiceDep = Annotated[
     ImportSessionService, Depends(get_import_session_service)
 ]
+
+
+# --- Station Setups ---
 
 
 def get_station_setup_repository(db: SessionDep) -> StationSetupRepository:
@@ -80,6 +94,9 @@ StationSetupServiceDep = Annotated[
 ]
 
 
+# --- Raw Observations ---
+
+
 def get_raw_observation_repository(db: SessionDep) -> RawObservationRepository:
     return RawObservationRepository(session=db)
 
@@ -100,6 +117,9 @@ def get_raw_observation_service(
 RawObservationServiceDep = Annotated[
     RawObservationService, Depends(get_raw_observation_service)
 ]
+
+
+# --- Bessel Observations ---
 
 
 def get_bessel_observation_repository(db: SessionDep) -> BesselObservationRepository:
@@ -124,6 +144,9 @@ BesselObservationServiceDep = Annotated[
 ]
 
 
+# --- Reference Coordinates ---
+
+
 def get_reference_coordinate_repository(
     db: SessionDep,
 ) -> ReferenceCoordinateRepository:
@@ -144,6 +167,9 @@ def get_reference_coordinate_service(
 ReferenceCoordinateServiceDep = Annotated[
     ReferenceCoordinateService, Depends(get_reference_coordinate_service)
 ]
+
+
+# --- Approximate coordinates ---
 
 
 def get_approximate_coordinate_repository(
@@ -171,6 +197,9 @@ ApproximateCoordinateServiceDep = Annotated[
 ]
 
 
+# --- Import Orchestrator ---
+
+
 def get_import_orchestrator_service(
     import_repo: ImportSessionRepositoryDep,
     station_repo: StationSetupRepositoryDep,
@@ -184,3 +213,60 @@ def get_import_orchestrator_service(
 ImportOrchestratorServiceDep = Annotated[
     ImportOrchestratorService, Depends(get_import_orchestrator_service)
 ]
+
+
+# --- Auth / Users ---
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+OAuth2Dep = Annotated[str, Depends(oauth2_scheme)]
+
+
+def get_user_repository(db: SessionDep) -> UserRepository:
+    return UserRepository(session=db)
+
+
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
+def get_password_service() -> PasswordService:
+    return PasswordService()
+
+
+def get_token_service() -> TokenService:
+    return TokenService()
+
+
+def get_user_service(
+    repo: UserRepositoryDep,
+    password_service: Annotated[PasswordService, Depends(get_password_service)],
+    token_service: Annotated[TokenService, Depends(get_token_service)],
+) -> UserService:
+    return UserService(
+        repository=repo, password_service=password_service, token_service=token_service
+    )
+
+
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def get_current_user(token: OAuth2Dep, service: UserServiceDep) -> UserResponse:
+    try:
+        token_svc = TokenService()
+        payload = token_svc.decode_token(token)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401, detail=str(e), headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    user = service.repository.get(payload.sub)
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Cuenta desactivada.")
+
+    return UserResponse.model_validate(user)
+
+
+CurrentUser = Annotated[UserResponse, Depends(get_current_user)]

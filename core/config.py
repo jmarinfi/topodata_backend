@@ -18,3 +18,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()  # type: ignore[call-arg]
+print(f"[config] secret_key cargado: '{settings.secret_key[:8]}...'")

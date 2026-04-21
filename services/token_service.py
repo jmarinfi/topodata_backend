@@ -18,7 +18,7 @@ class TokenService:
         """Genera un token JWT firmado con el ID y username del usuario."""
 
         expire = datetime.now(timezone.utc) + timedelta(minutes=self._expire_minutes)
-        payload = {"sub": user_id, "username": username, "exp": expire}
+        payload = {"sub": str(user_id), "username": username, "exp": expire}
 
         return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
@@ -28,7 +28,7 @@ class TokenService:
         try:
             raw = jwt.decode(token, self._secret_key, algorithms=[self._algorithm])
             return TokenPayload(
-                sub=raw["sub"],
+                sub=int(raw["sub"]),
                 username=raw["username"],
                 exp=datetime.fromtimestamp(raw["exp"], tz=timezone.utc),
             )
@@ -37,4 +37,4 @@ class TokenService:
             raise ValueError("El token ha expirado.") from e
 
         except jwt.InvalidTokenError as e:
-            raise ValueError("Token inválido.") from e
+            raise ValueError(f"Token inválido: {e!r}") from e

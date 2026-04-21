@@ -11,6 +11,7 @@ from api.routes import (
     raw_observation_router,
     reference_coordinate_router,
     station_setup_router,
+    user_router,
 )
 from data.database import engine, init_db
 
@@ -39,6 +40,7 @@ app.include_router(raw_observation_router)
 app.include_router(bessel_observation_router)
 app.include_router(reference_coordinate_router)
 app.include_router(approximate_coordinate_router)
+app.include_router(user_router)
 
 
 @app.get("/")

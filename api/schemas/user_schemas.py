@@ -24,6 +24,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     password: str | None = Field(None, min_length=8)
     is_active: bool | None = None
+    is_superuser: bool | None = None
 
 
 class UserResponse(UserBase):
@@ -43,7 +44,7 @@ class UserResponse(UserBase):
 class LoginRequest(BaseModel):
     """Credenciales para iniciar sesión."""
 
-    username: str
+    email: EmailStr
     password: str
 
 
