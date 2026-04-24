@@ -58,11 +58,11 @@ class ProjectBase(BaseModel):
 
                     data.update(
                         {
-                            "a_elip": data.get("a_elip") or a,
-                            "b_elip": data.get("b_elip") or b,
-                            "f_elip": data.get("f_elip") or f,
-                            "inv_f_elip": data.get("inv_f_elip") or inv_f,
-                            "k_0": data.get("k_0") or k0,
+                            "a_elip": a,
+                            "b_elip": b,
+                            "f_elip": f,
+                            "inv_f_elip": inv_f,
+                            "k_0": k0,
                         }
                     )
 
