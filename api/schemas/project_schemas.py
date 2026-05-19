@@ -26,7 +26,7 @@ class ProjectBase(BaseModel):
     inv_f_elip: float | None = Field(
         None, description="Inversa del aplanamiento del elipsoide"
     )
-    k_0: float | None = Field(None, gt=0, description="Factor de escala")
+    # k_0: float | None = Field(None, gt=0, description="Factor de escala")
 
     @model_validator(mode="before")
     @classmethod
