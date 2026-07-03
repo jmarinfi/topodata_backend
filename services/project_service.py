@@ -1,12 +1,17 @@
 from api.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
-from data.repositories import ProjectRepository
+from data.repositories import ImportSessionRepository, ProjectRepository
 
 
 class ProjectService:
     """Servicio para la gestión de proyectos."""
 
-    def __init__(self, repository: ProjectRepository) -> None:
+    def __init__(
+        self,
+        repository: ProjectRepository,
+        repository_import_session: ImportSessionRepository,
+    ) -> None:
         self.repository = repository
+        self.repository_import_session = repository_import_session
 
     def get_projects(self) -> list[ProjectResponse]:
         projects = self.repository.get_all()
@@ -48,4 +53,10 @@ class ProjectService:
         db_project = self.repository.get(project_id)
         if not db_project:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
+
+        # Borrar todas las import sessions del proyecto antes de borrar el proyecto
+        import_sessions = self.repository_import_session.get_by_project(project_id)
+        for import_session in import_sessions:
+            self.repository_import_session.delete(import_session)
+
         self.repository.delete(db_project)

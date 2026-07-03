@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from api.dependencies import ImportSessionServiceDep
+from api.dependencies import CurrentUser, ImportSessionServiceDep
 from api.schemas import ImportSessionCreate, ImportSessionResponse, ImportSessionUpdate
 
 router = APIRouter(prefix="/api/v1/import-sessions", tags=["import-sessions"])
@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/v1/import-sessions", tags=["import-sessions"])
 
 @router.get("/", response_model=list[ImportSessionResponse])
 def get_import_sessions(
-    service: ImportSessionServiceDep, project_id: int | None = None
+    service: ImportSessionServiceDep, _: CurrentUser, project_id: int | None = None
 ):
     if project_id is not None:
         return service.get_import_sessions_by_project(project_id)
@@ -16,12 +16,14 @@ def get_import_sessions(
 
 
 @router.get("/count", response_model=int)
-def get_number_import_sessions(service: ImportSessionServiceDep):
+def get_number_import_sessions(service: ImportSessionServiceDep, _: CurrentUser):
     return service.get_number_import_sessions()
 
 
 @router.get("/{import_session_id}", response_model=ImportSessionResponse)
-def get_import_session(import_session_id: int, service: ImportSessionServiceDep):
+def get_import_session(
+    import_session_id: int, service: ImportSessionServiceDep, _: CurrentUser
+):
     try:
         return service.get_import_session(import_session_id)
     except ValueError as e:
@@ -30,7 +32,9 @@ def get_import_session(import_session_id: int, service: ImportSessionServiceDep)
 
 @router.post("/", response_model=ImportSessionResponse, status_code=201)
 def create_import_session(
-    import_session_in: ImportSessionCreate, service: ImportSessionServiceDep
+    import_session_in: ImportSessionCreate,
+    service: ImportSessionServiceDep,
+    _: CurrentUser,
 ):
     try:
         import_session = service.create_import_session(import_session_in)
@@ -44,6 +48,7 @@ def update_import_session(
     import_session_id: int,
     import_session_in: ImportSessionUpdate,
     service: ImportSessionServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.update_import_session(import_session_id, import_session_in)
@@ -52,7 +57,9 @@ def update_import_session(
 
 
 @router.delete("/{import_session_id}", status_code=204)
-def delete_import_session(import_session_id: int, service: ImportSessionServiceDep):
+def delete_import_session(
+    import_session_id: int, service: ImportSessionServiceDep, _: CurrentUser
+):
     try:
         service.delete_import_session(import_session_id)
     except ValueError as e:

@@ -39,8 +39,12 @@ def get_project_repository(db: SessionDep) -> ProjectRepository:
 ProjectRepositoryDep = Annotated[ProjectRepository, Depends(get_project_repository)]
 
 
-def get_project_service(repo: ProjectRepositoryDep) -> ProjectService:
-    return ProjectService(repository=repo)
+def get_project_service(
+    repo: ProjectRepositoryDep, import_session_repo: ImportSessionRepositoryDep
+) -> ProjectService:
+    return ProjectService(
+        repository=repo, repository_import_session=import_session_repo
+    )
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
@@ -59,9 +63,15 @@ ImportSessionRepositoryDep = Annotated[
 
 
 def get_import_session_service(
-    repo: ImportSessionRepositoryDep, project_repo: ProjectRepositoryDep
+    repo: ImportSessionRepositoryDep,
+    project_repo: ProjectRepositoryDep,
+    station_setup_repo: StationSetupRepositoryDep,
 ) -> ImportSessionService:
-    return ImportSessionService(repository=repo, repository_project=project_repo)
+    return ImportSessionService(
+        repository=repo,
+        repository_project=project_repo,
+        repository_station_setup=station_setup_repo,
+    )
 
 
 ImportSessionServiceDep = Annotated[

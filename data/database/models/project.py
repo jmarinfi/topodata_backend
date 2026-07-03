@@ -22,7 +22,7 @@ class Project(Base):
     b_elip: Mapped[float] = mapped_column(Float)
     f_elip: Mapped[float] = mapped_column(Float)
     inv_f_elip: Mapped[float] = mapped_column(Float)
-    k_0: Mapped[float] = mapped_column(Float)
+    # k_0: Mapped[float] = mapped_column(Float)
 
     # Constantes para los cálculos
     GON_R: ClassVar[float] = math.pi / 200.0

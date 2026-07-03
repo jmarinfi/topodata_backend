@@ -45,16 +45,16 @@ class ProjectBase(BaseModel):
                     f = 1 / inv_f if inv_f != 0 else 0
 
                     # Factor de escala
-                    k0 = 1.0
-                    if crs.is_projected:
-                        # Se busca en los parámetros de la conversión
-                        conv_dict = crs.to_json_dict().get("conversion", {})
-                        params = conv_dict.get("parameters", [])
-                        for p in params:
-                            # El nombre estándar EPSG para k0 es "Scale factor at natural origin"
-                            if "Scale factor" in p.get("name", ""):
-                                k0 = p.get("value")
-                                break
+                    # k0 = 1.0
+                    # if crs.is_projected:
+                    #     # Se busca en los parámetros de la conversión
+                    #     conv_dict = crs.to_json_dict().get("conversion", {})
+                    #     params = conv_dict.get("parameters", [])
+                    #     for p in params:
+                    #         # El nombre estándar EPSG para k0 es "Scale factor at natural origin"
+                    #         if "Scale factor" in p.get("name", ""):
+                    #             k0 = p.get("value")
+                    #             break
 
                     data.update(
                         {
@@ -62,7 +62,7 @@ class ProjectBase(BaseModel):
                             "b_elip": b,
                             "f_elip": f,
                             "inv_f_elip": inv_f,
-                            "k_0": k0,
+                            # "k_0": k0,
                         }
                     )
 

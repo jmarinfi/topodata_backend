@@ -1,15 +1,23 @@
 from api.schemas import ImportSessionCreate, ImportSessionResponse, ImportSessionUpdate
-from data.repositories import ImportSessionRepository, ProjectRepository
+from data.repositories import (
+    ImportSessionRepository,
+    ProjectRepository,
+    StationSetupRepository,
+)
 
 
 class ImportSessionService:
     """Servicio para la gestión de sesiones de importación."""
 
     def __init__(
-        self, repository: ImportSessionRepository, repository_project: ProjectRepository
+        self,
+        repository: ImportSessionRepository,
+        repository_project: ProjectRepository,
+        repository_station_setup: StationSetupRepository,
     ) -> None:
         self.repository = repository
         self.repository_project = repository_project
+        self.repository_station_setup = repository_station_setup
 
     def get_import_sessions(self) -> list[ImportSessionResponse]:
         import_sessions = self.repository.get_all()
@@ -79,4 +87,12 @@ class ImportSessionService:
             raise ValueError(
                 f"Sesión de importación con id {import_session_id} no encontrada."
             )
+
+        # Borrar todos los stations setups de la sesión antes de borrarla
+        station_setups = self.repository_station_setup.get_by_import_session(
+            import_session_id
+        )
+        for station_setup in station_setups:
+            self.repository_station_setup.delete(station_setup)
+
         self.repository.delete(db_import_session)
