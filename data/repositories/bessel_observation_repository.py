@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from data.database.models import BesselObservation
@@ -21,3 +21,12 @@ class BesselObservationRepository(BaseRepository[BesselObservation]):
                 BesselObservation.station_setup_id == station_setup_id
             )
         ).all()
+
+    def delete_by_station_setup(self, station_setup_id: int) -> None:
+        """Borra en bloque todas las observaciones de Bessel de un estacionamiento."""
+        self._session.execute(
+            delete(BesselObservation).where(
+                BesselObservation.station_setup_id == station_setup_id
+            )
+        )
+        self._session.flush()

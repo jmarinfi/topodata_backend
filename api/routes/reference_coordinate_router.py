@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from api.dependencies import ReferenceCoordinateServiceDep
+from api.dependencies import CurrentUser, ReferenceCoordinateServiceDep
 from api.schemas import (
     ReferenceCoordinateCreate,
     ReferenceCoordinateResponse,
@@ -14,7 +14,9 @@ router = APIRouter(
 
 @router.get("/", response_model=list[ReferenceCoordinateResponse])
 def get_reference_coordinates(
-    service: ReferenceCoordinateServiceDep, project_id: int | None = None
+    service: ReferenceCoordinateServiceDep,
+    _: CurrentUser,
+    project_id: int | None = None,
 ):
     if project_id:
         return service.get_reference_coordinates_by_project(project_id)
@@ -22,13 +24,16 @@ def get_reference_coordinates(
 
 
 @router.get("/count", response_model=int)
-def get_number_reference_coordinates(service: ReferenceCoordinateServiceDep):
+def get_number_reference_coordinates(
+    service: ReferenceCoordinateServiceDep,
+    _: CurrentUser,
+):
     return service.get_number_reference_coordinates()
 
 
 @router.get("/{reference_coordinate_id}", response_model=ReferenceCoordinateResponse)
 def get_reference_coordinate(
-    reference_coordinate_id: int, service: ReferenceCoordinateServiceDep
+    reference_coordinate_id: int, service: ReferenceCoordinateServiceDep, _: CurrentUser
 ):
     try:
         return service.get_reference_coordinate(reference_coordinate_id)
@@ -40,6 +45,7 @@ def get_reference_coordinate(
 def create_reference_coordinate(
     reference_coordinate_in: ReferenceCoordinateCreate,
     service: ReferenceCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.create_reference_coordinate(reference_coordinate_in)
@@ -52,6 +58,7 @@ def update_reference_coordinate(
     reference_coordinate_id: int,
     reference_coordinate_in: ReferenceCoordinateUpdate,
     service: ReferenceCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.update_reference_coordinate(
@@ -63,7 +70,7 @@ def update_reference_coordinate(
 
 @router.delete("/{reference_coordinate_id}", status_code=204)
 def delete_reference_coordinate(
-    reference_coordinate_id: int, service: ReferenceCoordinateServiceDep
+    reference_coordinate_id: int, service: ReferenceCoordinateServiceDep, _: CurrentUser
 ):
     try:
         service.delete_reference_coordinate(reference_coordinate_id)

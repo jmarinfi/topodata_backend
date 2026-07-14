@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from api.dependencies import ApproximateCoordinateServiceDep
+from api.dependencies import CurrentUser, ApproximateCoordinateServiceDep
 from api.schemas import (
     ApproximateCoordinateCreate,
     ApproximateCoordinateResponse,
@@ -16,7 +16,10 @@ router = APIRouter(
     "/",
     response_model=list[ApproximateCoordinateResponse],
 )
-def get_approximate_coordinates(service: ApproximateCoordinateServiceDep):
+def get_approximate_coordinates(
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
+):
     return service.get_approximate_coordinates()
 
 
@@ -25,7 +28,9 @@ def get_approximate_coordinates(service: ApproximateCoordinateServiceDep):
     response_model=ApproximateCoordinateResponse,
 )
 def get_approximate_coordinate_by_bessel_observation(
-    bessel_observation_id: int, service: ApproximateCoordinateServiceDep
+    bessel_observation_id: int,
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
 ):
     return service.get_approximate_coordinate_by_bessel_observation(
         bessel_observation_id
@@ -33,7 +38,10 @@ def get_approximate_coordinate_by_bessel_observation(
 
 
 @router.get("/count", response_model=int)
-def get_number_approximate_coordinates(service: ApproximateCoordinateServiceDep):
+def get_number_approximate_coordinates(
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
+):
     return service.get_number_approximate_coordinates()
 
 
@@ -41,7 +49,9 @@ def get_number_approximate_coordinates(service: ApproximateCoordinateServiceDep)
     "/{approximate_coordinate_id}", response_model=ApproximateCoordinateResponse
 )
 def get_approximate_coordinate(
-    approximate_coordinate_id: int, service: ApproximateCoordinateServiceDep
+    approximate_coordinate_id: int,
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.get_approximate_coordinate(approximate_coordinate_id)
@@ -53,6 +63,7 @@ def get_approximate_coordinate(
 def create_approximate_coordinate(
     approximate_coordinate_in: ApproximateCoordinateCreate,
     service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.create_approximate_coordinate(approximate_coordinate_in)
@@ -67,6 +78,7 @@ def update_approximate_coordinate(
     approximate_coordinate_id: int,
     approximate_coordinate_in: ApproximateCoordinateUpdate,
     service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         return service.update_approximate_coordinate(
@@ -78,7 +90,9 @@ def update_approximate_coordinate(
 
 @router.delete("/{approximate_coordinate_id}", status_code=204)
 def delete_approximate_coordinate(
-    approximate_coordinate_id: int, service: ApproximateCoordinateServiceDep
+    approximate_coordinate_id: int,
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
 ):
     try:
         service.delete_approximate_coordinate(approximate_coordinate_id)

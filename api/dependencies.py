@@ -40,10 +40,14 @@ ProjectRepositoryDep = Annotated[ProjectRepository, Depends(get_project_reposito
 
 
 def get_project_service(
-    repo: ProjectRepositoryDep, import_session_repo: ImportSessionRepositoryDep
+    repo: ProjectRepositoryDep,
+    import_session_repo: ImportSessionRepositoryDep,
+    import_session_service: ImportSessionServiceDep,
 ) -> ProjectService:
     return ProjectService(
-        repository=repo, repository_import_session=import_session_repo
+        repository=repo,
+        repository_import_session=import_session_repo,
+        import_session_service=import_session_service,
     )
 
 
@@ -66,11 +70,13 @@ def get_import_session_service(
     repo: ImportSessionRepositoryDep,
     project_repo: ProjectRepositoryDep,
     station_setup_repo: StationSetupRepositoryDep,
+    station_setup_service: StationSetupServiceDep,
 ) -> ImportSessionService:
     return ImportSessionService(
         repository=repo,
         repository_project=project_repo,
         repository_station_setup=station_setup_repo,
+        station_setup_service=station_setup_service,
     )
 
 
@@ -92,10 +98,18 @@ StationSetupRepositoryDep = Annotated[
 
 
 def get_station_setup_service(
-    repo: StationSetupRepositoryDep, import_session_repo: ImportSessionRepositoryDep
+    repo: StationSetupRepositoryDep,
+    import_session_repo: ImportSessionRepositoryDep,
+    raw_observation_repo: RawObservationRepositoryDep,
+    bessel_observation_repo: BesselObservationRepositoryDep,
+    approximate_coordinate_repo: ApproximateCoordinateRepositoryDep,
 ) -> StationSetupService:
     return StationSetupService(
-        repository=repo, repository_import_session=import_session_repo
+        repository=repo,
+        repository_import_session=import_session_repo,
+        repository_raw_observation=raw_observation_repo,
+        repository_bessel_observation=bessel_observation_repo,
+        repository_approximate_coordinate=approximate_coordinate_repo,
     )
 
 

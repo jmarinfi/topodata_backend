@@ -40,8 +40,13 @@ class ImportOrchestratorService:
 
         content_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
 
-        if self.import_repo.get_by_project_and_hash(project_id, content_hash):
-            raise ValueError("Este archivo ya ha sido importado")
+        existing = self.import_repo.get_by_project_and_hash(project_id, content_hash)
+        if existing:
+            raise ValueError(
+                f"Este archivo ya fue importado en el proyecto {project_id} "
+                f"(sesión {existing.id}, {existing.filename}). "
+                f"Puedes importarlo en otro proyecto distinto."
+            )
 
         import_session = self.import_repo.create(
             {

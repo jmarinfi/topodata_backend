@@ -1,5 +1,11 @@
 from api.schemas import StationSetupCreate, StationSetupResponse, StationSetupUpdate
-from data.repositories import ImportSessionRepository, StationSetupRepository
+from data.repositories import (
+    ApproximateCoordinateRepository,
+    BesselObservationRepository,
+    ImportSessionRepository,
+    RawObservationRepository,
+    StationSetupRepository,
+)
 
 
 class StationSetupService:
@@ -9,9 +15,15 @@ class StationSetupService:
         self,
         repository: StationSetupRepository,
         repository_import_session: ImportSessionRepository,
+        repository_raw_observation: RawObservationRepository,
+        repository_bessel_observation: BesselObservationRepository,
+        repository_approximate_coordinate: ApproximateCoordinateRepository,
     ) -> None:
         self.repository = repository
         self.repository_import_session = repository_import_session
+        self.repository_raw_observation = repository_raw_observation
+        self.repository_bessel_observation = repository_bessel_observation
+        self.repository_approximate_coordinate = repository_approximate_coordinate
 
     def get_station_setups(self) -> list[StationSetupResponse]:
         stations_setups = self.repository.get_all()
@@ -70,10 +82,29 @@ class StationSetupService:
         self.repository.refresh(station_setup)
         return StationSetupResponse.model_validate(station_setup)
 
+    def _delete_station_setup_children(self, station_setup_id: int) -> None:
+        """Borra en bloque las observaciones brutas, Bessel y coordenadas
+        aproximadas vinculadas a un estacionamiento (sin tocar el propio
+        estacionamiento).
+
+        Punto único de verdad de la cascada hacia abajo: si en el futuro se
+        añade una nueva entidad hija de ``station_setup``, este es el único
+        método que hay que tocar. El borrado es por sentencia bulk (una por
+        tabla) en vez de fila a fila para evitar un N+1 en sesiones grandes.
+        """
+        # Orden: primero las hijas que referencian a las Bessel (y su fila padre
+        # de coordenadas, por herencia joined-table), luego las Bessel y por
+        # último las observaciones brutas.
+        self.repository_approximate_coordinate.delete_by_station_setup(station_setup_id)
+        self.repository_bessel_observation.delete_by_station_setup(station_setup_id)
+        self.repository_raw_observation.delete_by_station_setup(station_setup_id)
+
     def delete_station_setup(self, station_setup_id: int) -> None:
         db_station_setup = self.repository.get(station_setup_id)
         if not db_station_setup:
             raise ValueError(
                 f"Estacionamiento con id {station_setup_id} no encontrado."
             )
+
+        self._delete_station_setup_children(station_setup_id)
         self.repository.delete(db_station_setup)

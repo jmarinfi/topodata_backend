@@ -40,12 +40,12 @@ def get_me(current_user: CurrentUser):
 
 
 @router.get("/users", response_model=list[UserResponse])
-def get_users(service: UserServiceDep):
+def get_users(service: UserServiceDep, _: CurrentUser):
     return service.get_users()
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, service: UserServiceDep):
+def get_user(user_id: int, service: UserServiceDep, _: CurrentUser):
     try:
         return service.get_user(user_id)
     except ValueError as e:
@@ -53,7 +53,12 @@ def get_user(user_id: int, service: UserServiceDep):
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, user_in: UserUpdate, service: UserServiceDep):
+def update_user(
+    user_id: int,
+    user_in: UserUpdate,
+    service: UserServiceDep,
+    _: CurrentUser,
+):
     try:
         return service.update_user(user_id, user_in)
     except ValueError as e:
@@ -61,7 +66,7 @@ def update_user(user_id: int, user_in: UserUpdate, service: UserServiceDep):
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, service: UserServiceDep):
+def delete_user(user_id: int, service: UserServiceDep, _: CurrentUser):
     try:
         service.delete_user(user_id)
     except ValueError as e:

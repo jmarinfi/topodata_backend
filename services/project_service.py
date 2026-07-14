@@ -1,5 +1,6 @@
 from api.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from data.repositories import ImportSessionRepository, ProjectRepository
+from services.import_session_service import ImportSessionService
 
 
 class ProjectService:
@@ -9,9 +10,11 @@ class ProjectService:
         self,
         repository: ProjectRepository,
         repository_import_session: ImportSessionRepository,
+        import_session_service: ImportSessionService,
     ) -> None:
         self.repository = repository
         self.repository_import_session = repository_import_session
+        self.import_session_service = import_session_service
 
     def get_projects(self) -> list[ProjectResponse]:
         projects = self.repository.get_all()
@@ -54,9 +57,10 @@ class ProjectService:
         if not db_project:
             raise ValueError(f"Proyecto con id {project_id} no encontrado.")
 
-        # Borrar todas las import sessions del proyecto antes de borrar el proyecto
+        # La cascada hacia abajo (sessions -> setups -> observaciones y
+        # coordenadas) vive en un único sitio: ImportSessionService.delete_import_session.
         import_sessions = self.repository_import_session.get_by_project(project_id)
         for import_session in import_sessions:
-            self.repository_import_session.delete(import_session)
+            self.import_session_service.delete_import_session(import_session.id)
 
         self.repository.delete(db_project)

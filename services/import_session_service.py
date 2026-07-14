@@ -4,6 +4,7 @@ from data.repositories import (
     ProjectRepository,
     StationSetupRepository,
 )
+from services.station_setup_service import StationSetupService
 
 
 class ImportSessionService:
@@ -14,10 +15,12 @@ class ImportSessionService:
         repository: ImportSessionRepository,
         repository_project: ProjectRepository,
         repository_station_setup: StationSetupRepository,
+        station_setup_service: StationSetupService,
     ) -> None:
         self.repository = repository
         self.repository_project = repository_project
         self.repository_station_setup = repository_station_setup
+        self.station_setup_service = station_setup_service
 
     def get_import_sessions(self) -> list[ImportSessionResponse]:
         import_sessions = self.repository.get_all()
@@ -88,11 +91,12 @@ class ImportSessionService:
                 f"Sesión de importación con id {import_session_id} no encontrada."
             )
 
-        # Borrar todos los stations setups de la sesión antes de borrarla
         station_setups = self.repository_station_setup.get_by_import_session(
             import_session_id
         )
         for station_setup in station_setups:
-            self.repository_station_setup.delete(station_setup)
+            # La cascada hacia abajo (raw/bessel/approx + el propio estacionamiento)
+            # vive en un único sitio: StationSetupService.delete_station_setup.
+            self.station_setup_service.delete_station_setup(station_setup.id)
 
         self.repository.delete(db_import_session)
