@@ -74,6 +74,14 @@ class ApproximateCoordinateService:
             for approximate_coordinate in approximate_coordinates
         ]
 
+    def get_approximate_coordinates_by_station_setup(
+        self, station_setup_id: int
+    ) -> list[ApproximateCoordinateResponse]:
+        """Coordenadas aproximadas de todas las observaciones Bessel de un
+        estacionamiento."""
+        coords = self.repository.get_by_station_setup(station_setup_id)
+        return [ApproximateCoordinateResponse.model_validate(c) for c in coords]
+
     def get_approximate_coordinate_by_bessel_observation(
         self, bessel_observation_id: int
     ) -> ApproximateCoordinateResponse:

@@ -24,6 +24,20 @@ def get_approximate_coordinates(
 
 
 @router.get(
+    "/by-station-setup/{station_setup_id}",
+    response_model=list[ApproximateCoordinateResponse],
+)
+def get_approximate_coordinates_by_station_setup(
+    station_setup_id: int,
+    service: ApproximateCoordinateServiceDep,
+    _: CurrentUser,
+):
+    """Coordenadas aproximadas de todas las observaciones Bessel de un
+    estacionamiento."""
+    return service.get_approximate_coordinates_by_station_setup(station_setup_id)
+
+
+@router.get(
     "/by-bessel-observation/{bessel_observation_id}",
     response_model=ApproximateCoordinateResponse,
 )

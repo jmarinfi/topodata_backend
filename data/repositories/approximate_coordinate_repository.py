@@ -20,6 +20,22 @@ class ApproximateCoordinateRepository(BaseRepository[ApproximateCoordinate]):
             )
         ).one_or_none()
 
+    def get_by_station_setup(
+        self, station_setup_id: int
+    ) -> list[ApproximateCoordinate]:
+        """Coordenadas aproximadas cuyas observaciones Bessel pertenecen al
+        estacionamiento indicado."""
+        bessel_ids = select(BesselObservation.id).where(
+            BesselObservation.station_setup_id == station_setup_id
+        )
+        return list(
+            self._session.scalars(
+                select(ApproximateCoordinate).where(
+                    ApproximateCoordinate.bessel_observation_id.in_(bessel_ids)
+                )
+            ).all()
+        )
+
     def delete_by_station_setup(self, station_setup_id: int) -> None:
         """Borra en bloque las coordenadas aproximadas de un estacionamiento.
 
