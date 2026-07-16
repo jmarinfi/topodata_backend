@@ -74,7 +74,10 @@ class GkaParser(ParserBase):
         current_station: StationSetupParsed | None = None
         is_new_station = False
 
-        for line in self.lines:
+        # `enumerate` con `start=1` para que el número de línea que reportamos
+        # en los errores coincida con el que ve el usuario en un editor de texto
+        # (los editores cuentan desde 1).
+        for line_number, line in enumerate(self.lines, start=1):
             line = line.strip()
             if not line or line.startswith(";"):
                 continue
@@ -109,9 +112,14 @@ class GkaParser(ParserBase):
                         current_observations.append(raw_observation)
 
             except (ValueError, ValidationError) as e:
+                # Formato deliberadamente estable (línea + contenido + causa en
+                # líneas separadas, prefijos "Error en la línea N:" y "Causa:")
+                # para que el frontend pueda parsearlo con una regex.
                 raise ValueError(
-                    f"Error parseando archivo GKA en la línea:\n{line}\n{str(e)}"
-                )
+                    f"Error en la línea {line_number}:\n"
+                    f"  {line}\n"
+                    f"Causa: {str(e)}"
+                ) from e
 
         if current_station is not None:
             parsed_data.append(GkaParserResult(current_station, current_observations))

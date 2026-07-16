@@ -216,9 +216,20 @@ ApproximateCoordinateRepositoryDep = Annotated[
 def get_approximate_coordinate_service(
     repo: ApproximateCoordinateRepositoryDep,
     bessel_observation_repo: BesselObservationRepositoryDep,
+    station_setup_repo: StationSetupRepositoryDep,
+    project_repo: ProjectRepositoryDep,
+    reference_coordinate_repo: ReferenceCoordinateRepositoryDep,
+    raw_observation_repo: RawObservationRepositoryDep,
+    import_session_repo: ImportSessionRepositoryDep,
 ) -> ApproximateCoordinateService:
     return ApproximateCoordinateService(
-        repository=repo, repository_bessel_observation=bessel_observation_repo
+        repository=repo,
+        repository_bessel_observation=bessel_observation_repo,
+        repository_station_setup=station_setup_repo,
+        repository_project=project_repo,
+        repository_reference_coordinate=reference_coordinate_repo,
+        repository_raw_observation=raw_observation_repo,
+        repository_import_session=import_session_repo,
     )
 
 

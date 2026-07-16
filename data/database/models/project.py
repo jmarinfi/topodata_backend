@@ -22,10 +22,9 @@ class Project(Base):
     b_elip: Mapped[float] = mapped_column(Float)
     f_elip: Mapped[float] = mapped_column(Float)
     inv_f_elip: Mapped[float] = mapped_column(Float)
-    # k_0: Mapped[float] = mapped_column(Float)
-
     # Constantes para los cálculos
     GON_R: ClassVar[float] = math.pi / 200.0
     EARTH_RADIUS: ClassVar[float] = 6378000.0
     S_SEXA_CC: ClassVar[float] = 250.0 / 81.0
     R_CC: ClassVar[float] = 2000000.0 / math.pi
+    K_0_ADIM: ClassVar[float] = 0.9996  # Factor de escala UTM del meridiano central
