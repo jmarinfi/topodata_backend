@@ -71,7 +71,11 @@ class BesselAdjuster:
             subset=[col for col in required_cols if col in pivot_df.columns]
         )
 
-        if pivot_df.empty:
+        # Si faltan columnas (p.ej. sólo había círculo 1) o no queda ninguna
+        # fila con pares directo/inverso, abortamos como "no válido". Sin esta
+        # guarda el código de abajo reventaría con KeyError en las columnas
+        # inversas que el pivot no creó.
+        if pivot_df.empty or not all(c in pivot_df.columns for c in required_cols):
             raise ValueError(
                 "No hay observaciones válidas con observaciones directas e inversas."
             )

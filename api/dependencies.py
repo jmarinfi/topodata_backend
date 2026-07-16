@@ -156,10 +156,16 @@ BesselObservationRepositoryDep = Annotated[
 
 
 def get_bessel_observation_service(
-    repo: BesselObservationRepositoryDep, station_setup_repo: StationSetupRepositoryDep
+    repo: BesselObservationRepositoryDep,
+    station_setup_repo: StationSetupRepositoryDep,
+    raw_observation_repo: RawObservationRepositoryDep,
+    approximate_coordinate_repo: ApproximateCoordinateRepositoryDep,
 ) -> BesselObservationService:
     return BesselObservationService(
-        repository=repo, repository_station_setup=station_setup_repo
+        repository=repo,
+        repository_station_setup=station_setup_repo,
+        repository_raw_observation=raw_observation_repo,
+        repository_approximate_coordinate=approximate_coordinate_repo,
     )
 
 
@@ -228,9 +234,13 @@ def get_import_orchestrator_service(
     import_repo: ImportSessionRepositoryDep,
     station_repo: StationSetupRepositoryDep,
     obs_repo: RawObservationRepositoryDep,
+    bessel_service: BesselObservationServiceDep,
 ) -> ImportOrchestratorService:
     return ImportOrchestratorService(
-        import_repo=import_repo, station_repo=station_repo, obs_repo=obs_repo
+        import_repo=import_repo,
+        station_repo=station_repo,
+        obs_repo=obs_repo,
+        bessel_service=bessel_service,
     )
 
 
