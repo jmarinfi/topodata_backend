@@ -85,3 +85,7 @@ class ReferenceCoordinateService:
                 f"Referencia con id {reference_coordinate_id} no encontrada."
             )
         self.repository.delete(db_reference_coordinate)
+
+    def delete_by_project(self, project_id: int) -> None:
+        """Borra todas las coordenadas de referencia asociadas a un proyecto."""
+        self.repository.delete_by_project(project_id)

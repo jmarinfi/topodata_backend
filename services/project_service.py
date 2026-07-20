@@ -1,6 +1,7 @@
 from api.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from data.repositories import ImportSessionRepository, ProjectRepository
 from services.import_session_service import ImportSessionService
+from services.reference_coordinate_service import ReferenceCoordinateService
 
 
 class ProjectService:
@@ -11,10 +12,12 @@ class ProjectService:
         repository: ProjectRepository,
         repository_import_session: ImportSessionRepository,
         import_session_service: ImportSessionService,
+        reference_coordinate_service: ReferenceCoordinateService,
     ) -> None:
         self.repository = repository
         self.repository_import_session = repository_import_session
         self.import_session_service = import_session_service
+        self.reference_coordinate_service = reference_coordinate_service
 
     def get_projects(self) -> list[ProjectResponse]:
         projects = self.repository.get_all()
@@ -62,5 +65,8 @@ class ProjectService:
         import_sessions = self.repository_import_session.get_by_project(project_id)
         for import_session in import_sessions:
             self.import_session_service.delete_import_session(import_session.id)
+
+        # Las reference_coordinates no cuelgan de import_sessions, se borran aparte.
+        self.reference_coordinate_service.delete_by_project(project_id)
 
         self.repository.delete(db_project)

@@ -43,11 +43,13 @@ def get_project_service(
     repo: ProjectRepositoryDep,
     import_session_repo: ImportSessionRepositoryDep,
     import_session_service: ImportSessionServiceDep,
+    reference_coordinate_service: ReferenceCoordinateServiceDep,
 ) -> ProjectService:
     return ProjectService(
         repository=repo,
         repository_import_session=import_session_repo,
         import_session_service=import_session_service,
+        reference_coordinate_service=reference_coordinate_service,
     )
 
 
