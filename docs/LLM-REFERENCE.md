@@ -1,6 +1,6 @@
 # TopoData Backend — Referencia Completa para Agentes LLM
 
-> **Versión:** 2026-07-16 | **Lenguaje:** Python ≥ 3.14 | **Framework:** FastAPI | **ORM:** SQLAlchemy 2.0+ | **DB:** SQLite con Alembic
+> **Versión:** 2026-07-22 | **Lenguaje:** Python ≥ 3.14 | **Framework:** FastAPI | **ORM:** SQLAlchemy 2.0+ | **DB:** SQLite con Alembic
 
 ---
 
@@ -82,7 +82,9 @@ topodata_backend/
 │   │   └── utils/
 │   │       └── parsers_utils.py     # get_str, get_req_str, get_float, get_int, ...
 │   └── calculations/
-│       └── bessel_adjuster.py       # Cálculo de promedios Bessel (pandas + numpy)
+│       ├── bessel_adjuster.py                # Cálculo de promedios Bessel (pandas + numpy)
+│       ├── station_position_calculator.py    # Inversa planimétrica, k_utm, ZEST
+│       └── approximate_coordinate_calculator.py # Desorientación y radiación
 │
 ├── tests/
 │   ├── conftest.py                  # Fixtures: DB SQLite en memoria, client, auth_client
@@ -141,8 +143,8 @@ topodata_backend/
 | Modelo | Tabla | PK | FK → | Notas |
 |--------|-------|----|------|-------|
 | `Project` | `projects` | `id` | — | Parámetros elipsoidales (`a_elip`, `b_elip`, `f_elip`, `inv_f_elip`), constantes de clase (`GON_R`, `EARTH_RADIUS`, etc.) |
-| `ImportSession` | `import_sessions` | `id` | `project_id → projects.id` | UniqueConstraint(`project_id`, `content_hash`). Atributos `kt_coef_refr`, `prec_ang_etr` |
-| `StationSetup` | `station_setups` | `id` | `import_session_id → import_sessions.id` | Columnas de cálculo (`etr_x/y/z`, `k_utm`, `desorientacion`) y 20+ columnas `LargeBinary` para matrices |
+| `ImportSession` | `import_sessions` | `id` | `project_id → projects.id` | UniqueConstraint(`project_id`, `content_hash`). Atributos `kt_coef_refr`, `prec_ang_etr`. Almacena el contenido completo del fichero importado en `raw_file_content` (Text). |
+| `StationSetup` | `station_setups` | `id` | `import_session_id → import_sessions.id` | Columnas de cálculo (`etr_x/y/z`, `k_utm`, `desorientacion`) y 17 columnas `LargeBinary` para matrices de ajuste (v, a, tra_a, p, tra_a_p, x, l, n, inver_n, t, tra_v_p, desv_post, var_post, num_equations, num_unknowns, inter_conf, prec, adjust_coord) |
 | `RawObservation` | `raw_observations` | `id` | `station_setup_id → station_setups.id` | Ángulos en **gon** (grados centesimales). `circle ∈ {1, 2}` |
 | `BesselObservation` | `bessel_observations` | `id` | `station_setup_id → station_setups.id` | 12 columnas: directo, inverso, bessel, delta para hz/v/dist |
 | `Coordinate` | `coordinates` | `id` | — | **Polimórfica** (joined-table inheritance). Discriminador: `type` |
@@ -161,7 +163,7 @@ topodata_backend/
 | `StationSetupRepository` | `StationSetup` | `get_by_import_session(import_session_id)` |
 | `RawObservationRepository` | `RawObservation` | `get_by_station_setup(id)`, `delete_by_station_setup(id)` (bulk) |
 | `BesselObservationRepository` | `BesselObservation` | `get_by_station_setup(id)`, `delete_by_station_setup(id)` (bulk) |
-| `ApproximateCoordinateRepository` | `ApproximateCoordinate` | `get_by_bessel_observation(id)`, `delete_by_station_setup(id)` (bulk, borra fila padre `Coordinate`) |
+| `ApproximateCoordinateRepository` | `ApproximateCoordinate` | `get_by_bessel_observation(id)`, `get_by_station_setup(id)`, `delete_by_station_setup(id)` (bulk, borra también la fila padre `Coordinate`) |
 | `ReferenceCoordinateRepository` | `ReferenceCoordinate` | `get_by_project(project_id)` |
 | `UserRepository` | `User` | `get_by_username(name)`, `get_by_email(email)`, `exists_by_username(name)`, `exists_by_email(email)` |
 
@@ -169,12 +171,12 @@ topodata_backend/
 
 | Servicio | Dependencias (repos) | Métodos clave |
 |----------|---------------------|---------------|
-| `ProjectService` | `ProjectRepository`, `ImportSessionRepository`, `ImportSessionService` | `get_projects()`, `get_project(id)`, `create_project(data)`, `update_project(id,data)`, `delete_project(id)` (cascada manual vía `ImportSessionService`) |
+| `ProjectService` | `ProjectRepository`, `ImportSessionRepository`, `ImportSessionService`, `ReferenceCoordinateService` | `get_projects()`, `get_project(id)`, `create_project(data)`, `update_project(id,data)`, `delete_project(id)` (cascada manual: sessions vía `ImportSessionService` + ref coords vía `ReferenceCoordinateService`) |
 | `ImportSessionService` | `ImportSessionRepository`, `ProjectRepository`, `StationSetupRepository`, `StationSetupService` | `get_import_sessions()`, `get_by_project(pid)`, `create` (valida proyecto + hash único), `delete` (cascada vía `StationSetupService`) |
 | `StationSetupService` | `StationSetupRepository`, `ImportSessionRepository`, `RawObservationRepository`, `BesselObservationRepository`, `ApproximateCoordinateRepository` | `_delete_station_setup_children(id)` (bulk: approx → bessel → raw, en orden) |
 | `RawObservationService` | `RawObservationRepository`, `StationSetupRepository` | CRUD estándar |
 | `BesselObservationService` | `BesselObservationRepository`, `StationSetupRepository`, `RawObservationRepository`, `ApproximateCoordinateRepository` | **`calculate_for_station_setup(id) → BesselCalculationResult`** (idempotente, fallo suave) |
-| `ApproximateCoordinateService` | `ApproximateCoordinateRepository`, `BesselObservationRepository` | CRUD estándar + `get_by_bessel_observation(id)` |
+| `ApproximateCoordinateService` | `ApproximateCoordinateRepository`, `BesselObservationRepository`, `StationSetupRepository`, `ProjectRepository`, `ReferenceCoordinateRepository`, `RawObservationRepository`, `ImportSessionRepository` | CRUD estándar + `get_by_bessel_observation(id)` + `get_by_station_setup(id)` + `calculate_for_station_setup(id) → ApproximateCoordinateCalculationResult` (desorientación + radiación) |
 | `ReferenceCoordinateService` | `ReferenceCoordinateRepository`, `ProjectRepository` | CRUD estándar + `get_by_project(id)` |
 | `ImportOrchestratorService` | `ImportSessionRepository`, `StationSetupRepository`, `RawObservationRepository`, `BesselObservationService` | **`process_gka_import(project_id, filename, file_content) → GkaImportResult`** |
 | `UserService` | `UserRepository`, `PasswordService`, `TokenService` | `register(data)`, `login(credentials) → TokenResponse`, `update_user(id, data)` |
@@ -194,7 +196,19 @@ topodata_backend/
 
 | Clase | Archivo | Propósito |
 |-------|---------|-----------|
-| `BesselAdjuster` | `bessel_adjuster.py` | **`adjust_bessel() → list[BesselObservationCreate]`**. Toma `StationSetupResponse` + `list[RawObservationResponse]`, filtra observaciones con `v_angle≠0` y `distance_geom≠0`, pivotea por `target_name` y `circle` (1=directo, 2=inverso), y calcula promedios Bessel: `hz_bessel = (direct + inverse ± 200)/2`, `v_bessel = direct - (direct+inverse-400)/2`, `distance_bessel = mean(direct, inverse)`. Usa **pandas** (`pivot_table`) + **numpy** (`np.where`). |
+| `BesselAdjuster` | `bessel_adjuster.py` | **`adjust_bessel() → list[BesselObservationCreate]`**. Toma `StationSetupResponse` + `list[RawObservationResponse]`, filtra observaciones con `v_angle≠0` y `distance_geom≠0`, pivotea por `target_name` y `circle` (1=directo, 2=inverso), y calcula promedios Bessel. Usa **pandas** (`pivot_table`) + **numpy** (`np.where`). |
+| `StationPositionCalculator` | `station_position_calculator.py` | **Inversa planimétrica de Cassini** (método de instancia) → coordenadas `etr_x`, `etr_y`. **Factor de escala UTM** `k_utm` (método estático). **Cota de la estación** `etr_z` (ZEST) por ángulos verticales con reducción al elipsoide. |
+| `ApproximateCoordinateCalculator` | `approximate_coordinate_calculator.py` | **Desorientación del estacionamiento** (B2.5): calcula el promedio de acimutes a referencias conocidas. **Radiación de coordenadas** (B2.6): proyecta cada observación Bessel desde la estación para obtener coordenadas aproximadas. |
+
+**Dataclasses auxiliares de cálculo:**
+
+| Dataclass | Archivo | Propósito |
+|-----------|---------|-----------|
+| `ResectionResult` | `station_position_calculator.py` | `etr_x`, `etr_y`, `combinations` (nº de tríos válidos) |
+| `ZEstResult` | `station_position_calculator.py` | `z_est` (cota final), `z_prima_mean` (cota media), `combinations` |
+| `DesorientacionResult` | `approximate_coordinate_calculator.py` | `desorientacion`, `combinations` |
+| `RadiacionResult` | `approximate_coordinate_calculator.py` | `target_name`, `x`, `y`, `z` + intermedios (`w_cc`, `r_cc`, `dist_hor`, `dist_elip`, `dist_utm`, `acimut`) |
+| `ApproximateCoordinateCalculationResult` | `approximate_coordinate_service.py` | `approximate_coordinates`, `etr_x/y/z`, `k_utm`, `desorientacion`, `warnings` |
 
 **Fórmulas Bessel (gon):**
 
@@ -352,8 +366,15 @@ Project
 ## 8. CONFIGURACIÓN
 
 - **Archivo:** `core/config.py` → `Settings(BaseSettings)` con `model_config = SettingsConfigDict(env_file=".env")`
-- **Variables:** `secret_key` (requerida), `algorithm` (default HS256), `access_token_expire_minutes` (default 60)
+- **Variables:** `secret_key` (requerida, sin ella la app no arranca), `algorithm` (default HS256), `access_token_expire_minutes` (default 60)
+- **Archivo `.env`:** Debe existir en la raíz del proyecto. Ejemplo mínimo:
+  ```env
+  SECRET_KEY="clave-secreta-de-al-menos-32-caracteres"
+  ALGORITHM="HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES=120
+  ```
 - **Singleton:** `settings = Settings()` (global, se imprime al importar)
+- **Generar SECRET_KEY:** `openssl rand -base64 32`
 
 ---
 
@@ -405,6 +426,13 @@ Project
 
 ## 12. PATRONES DE USO COMÚN PARA EL AGENTE
 
+### ¿Cómo empezar desde cero en una máquina nueva?
+1. `git clone` + `uv sync`
+2. Crear archivo `.env` con `SECRET_KEY` (generar con `openssl rand -base64 32`)
+3. `uv run alembic upgrade head`
+4. `uv run python create_user.py` (crear primer usuario)
+5. `uv run fastapi dev main.py`
+
 ### ¿Cómo añadir un nuevo endpoint?
 1. Crear/esquema en `api/schemas/`
 2. Añadir método al service correspondiente en `services/`
@@ -442,6 +470,9 @@ Project
 # Instalar dependencias
 uv sync
 
+# Generar SECRET_KEY para .env (si no existe)
+openssl rand -base64 32
+
 # Ejecutar servidor de desarrollo
 uv run fastapi dev main.py
 
@@ -453,6 +484,9 @@ uv run alembic revision --autogenerate -m "descripción"
 
 # Ejecutar tests
 uv run pytest
+
+# Ejecutar tests con output detallado
+uv run pytest -v
 
 # Crear usuario (script independiente)
 uv run python create_user.py
