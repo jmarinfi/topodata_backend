@@ -118,6 +118,35 @@ def test_sigma_dist_p2_against_excel_oracle():
     assert r.sigma_dist[0] == pytest.approx(expected, rel=1e-4)
 
 
+def test_per_target_precision_fields_are_used():
+    """prec_senal y prec_punteria_cc son por punto (LsTarget): valores no
+    por defecto y señal != 0 deben reflejarse exactamente en sigma_dir/sigma_dist.
+
+    Cubre los términos de señal (nunca ejercitados con señal=0) y confirma que
+    los campos por punto se usan, no un valor global.
+    """
+    # punteria no por defecto (6.0) en sigma_dir, con señal = 0
+    t = _p1_target(prec_senal=0.0, prec_punteria_cc=6.0)
+    r = _make_adjuster(t).calculate()
+    expected_dir = math.sqrt((PREC_ANG_ETR * S_SEXA_CC) ** 2 + 6.0 ** 2)
+    assert r.sigma_dir[0] == pytest.approx(expected_dir, rel=1e-12)
+
+    # señal != 0 contribuye a sigma_dist (y a sigma_dir vía señal/dist*r_cc)
+    t2 = _p2_target(prec_senal=0.005)
+    r2 = _make_adjuster(t2).calculate()
+    expected_dist = math.sqrt(
+        0.005 ** 2
+        + (PREC_DIST_MM / 1000.0 + PREC_DIST_PPM * 1e-6 * P2_DIST_UTM) ** 2
+    )
+    assert r2.sigma_dist[0] == pytest.approx(expected_dist, rel=1e-12)
+    expected_dir2 = math.sqrt(
+        (PREC_ANG_ETR * S_SEXA_CC) ** 2
+        + (0.005 / P2_DIST_UTM * R_CC) ** 2
+        + 3.09 ** 2
+    )
+    assert r2.sigma_dir[0] == pytest.approx(expected_dir2, rel=1e-12)
+
+
 # ------------------------------------------------------------------ #
 # (b) Coeficientes de A
 # ------------------------------------------------------------------ #
@@ -135,6 +164,22 @@ def test_a_matrix_distance_coefficients():
     r = _make_adjuster(t).calculate()
     assert r.a[1, 0] == pytest.approx(P1_DE / P1_DIST_UTM, rel=1e-8)
     assert r.a[1, 1] == pytest.approx(P1_DN / P1_DIST_UTM, rel=1e-8)
+
+
+def test_l_matrix_values():
+    """L direccion = -(acim_calc - acim_obs)*10000; L distancia = -(dist_calc - dist_utm).
+
+    Los tests algebraicos usan r.l como entrada, por lo que la construccion de L
+    no queda validada salvo en este test.
+    """
+    t = _p1_target()
+    r = _make_adjuster(t).calculate()
+    de = P1_DE
+    dn = P1_DN
+    dist_calc = math.hypot(de, dn)
+    acim_calc = (math.atan2(de, dn) / GON_R) % 400.0
+    assert r.l[0] == pytest.approx(-(acim_calc - P1_ACIMUT) * 10000.0, abs=1e-6)
+    assert r.l[1] == pytest.approx(-(dist_calc - P1_DIST_UTM), abs=1e-6)
 
 
 def test_a_matrix_shape():

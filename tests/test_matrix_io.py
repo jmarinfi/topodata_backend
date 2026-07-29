@@ -1,3 +1,4 @@
+import io
 import math
 
 import numpy as np
@@ -161,14 +162,11 @@ def test_keystone_all_matrices_roundtrip():
 # ------------------------------------------------------------------ #
 
 def test_from_bytes_rejects_pickle():
-    import pickle
-    import io
-
+    """from_bytes usa allow_pickle=False: un payload que exige pickle debe rechazarse."""
     buf = io.BytesIO()
-    np.save(buf, np.array([1, 2, 3]), allow_pickle=False)
-    buf.seek(0)
-    result = from_bytes(buf.getvalue())
-    assert np.array_equal(result, np.array([1, 2, 3]))
+    np.save(buf, np.array(["x"], dtype=object), allow_pickle=True)
+    with pytest.raises(ValueError):
+        from_bytes(buf.getvalue())
 
 
 def test_scalar_roundtrip_preserves_negative():
