@@ -11,6 +11,8 @@ class ApproximateCoordinateBase(CoordinateBase):
     bessel_observation_id: int = Field(
         ..., description="Id de la observación de Bessel"
     )
+    prec_senal: float = Field(default=0.0, description="Precisión de señal/prisma (m)")
+    prec_punteria_cc: float = Field(default=3.09, description="Precisión de puntería (cc)")
 
 
 class ApproximateCoordinateCreate(ApproximateCoordinateBase):

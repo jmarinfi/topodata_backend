@@ -23,3 +23,5 @@ class ImportSession(Base):
 
     kt_coef_refr: Mapped[float] = mapped_column(Float, default=0.13)
     prec_ang_etr: Mapped[float] = mapped_column(Float, default=0.5)
+    prec_dist_mm: Mapped[float] = mapped_column(Float, default=0.8)
+    prec_dist_ppm: Mapped[float] = mapped_column(Float, default=1)

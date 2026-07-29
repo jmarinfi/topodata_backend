@@ -17,6 +17,8 @@ class ImportSessionBase(BaseModel):
         description="Resumen hash del contenido del fichero",
     )
     raw_file_content: str = Field(..., description="Contenido del fichero")
+    prec_dist_mm: float = Field(default=0.8, gt=0, description="Precisión del distanciómetro (mm)")
+    prec_dist_ppm: float = Field(default=1, gt=0, description="Precisión del distanciómetro (ppm)")
 
 
 class ImportSessionCreate(ImportSessionBase):
