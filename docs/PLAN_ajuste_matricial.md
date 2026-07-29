@@ -75,11 +75,13 @@ Sigue el patrón de [station_position_calculator.py](../services/calculations/st
 - **`@dataclass LeastSquaresResult`** con todos los arrays numpy (`sigma_dir, sigma_dist, a, tra_a, p, tra_a_p, l, n, inver_n, t, x, v, tra_v_p`), escalares (`num_equations, num_unknowns, redundancy, var_post, desv_post, inter_conf`), `prec` (array 2k) y `adjusted_coords` (lista `(target_name, x, y)`) + `warnings`.
 - Constante `INTER_CONF_DEFAULT = 1.9599639845400536`.
 
-### 2. Helper de serialización — `services/calculations/matrix_io.py`
-Como no existe ningún (de)serializador de matrices en el repo, se introduce **una vez** y se aplica a las 18 columnas:
+### 2. Helper de serialización — `services/calculations/matrix_io.py` **(Etapa 2 completada)**
+Implementado en la Etapa 2 (`docs/PLAN_etapa2_matrix_io.md`):
 - `to_bytes(arr) -> bytes`: `np.save(io.BytesIO(), np.asarray(arr)).getvalue()` (preserva dtype y shape, sin metadatos externos).
-- `from_bytes(b) -> np.ndarray`: `np.load(io.BytesIO(b))`.
-- `scalar_to_bytes(x)` / `scalar_from_bytes(b)` (0-d arrays vía el mismo helper; `num_equations`, `num_unknowns`, `inter_conf`, `var_post`, `desv_post` son escalares).
+- `from_bytes(b) -> np.ndarray`: `np.load(io.BytesIO(b), allow_pickle=False)` (seguro).
+- `scalar_to_bytes(x)` / `scalar_from_bytes(b)` (wrappers para escalares; `.item()`).
+- Tests: 10 casos cubriendo round-trip 1D/2D/0-d/empty, dtype int, escalares y keystone con `LeastSquaresResult` real.
+- **Pendiente:** representación de `adjust_coord` (lista `(str, float, float)`) → Etapa 3.
 
 ### 3. Integración (encadenada) — `services/approximate_coordinate_service.py`
 En `calculate_for_station_setup` ([líneas ~319-344](../services/approximate_coordinate_service.py#L319-L344)), **después** de calcular las radiaciones y **antes/tras** persistir los escalares de estación:
@@ -116,8 +118,11 @@ Las 18 columnas `LargeBinary` de `StationSetup` ya existían desde `142b9835b1b5
 - `api/schemas/approximate_coordinate_schemas.py` — exponer `prec_senal`, `prec_punteria_cc`.
 - `docs/PLAN_ajuste_matricial.md` — cerrar Supuesto 1, reflejar modelo de datos.
 
-**Pendientes (etapas siguientes):**
-- `services/calculations/matrix_io.py` — (de)serialización numpy↔bytes.
+**Nuevos (Etapa 2):**
+- `services/calculations/matrix_io.py` — (de)serializacion numpy<->bytes.
+- `tests/test_matrix_io.py` — tests de serializacion (10 casos, incluyendo keystone).
+
+**Pendientes (etapa siguiente):**
 - `services/approximate_coordinate_service.py` — cadena MMC + persistir 18 matrices + extender `ApproximateCoordinateCalculationResult`.
 - `tests/test_approximate_pipeline.py` — afirmar que las columnas de matriz quedan pobladas.
 
@@ -145,7 +150,7 @@ Las 18 columnas `LargeBinary` de `StationSetup` ya existían desde `142b9835b1b5
 | Etapa | Descripción | Estado |
 |-------|------------|--------|
 | 1 | Modelo de precisiones + calculador puro MMC + tests | **Completada** |
-| 2 | `matrix_io.py` + integración en `approximate_coordinate_service` | Pendiente |
-| 3 | Persistencia de las 18 matrices + pipeline tests | Pendiente |
+| 2 | `matrix_io.py` — serialización numpy↔bytes | **Completada** |
+| 3 | Integración en `approximate_coordinate_service` + persistencia 18 matrices | Pendiente |
 
 Ver `docs/PLAN_etapa1_calculador_mmc.md` para el desglose detallado de las tareas de la Etapa 1 (T1–T7).
