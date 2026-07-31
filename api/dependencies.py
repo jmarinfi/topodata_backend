@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from api.schemas.user_schemas import UserResponse
 from data.database import SessionDep
 from data.repositories import (
+    AdjustedCoordinateRepository,
     ApproximateCoordinateRepository,
     BesselObservationRepository,
     ImportSessionRepository,
@@ -16,6 +17,7 @@ from data.repositories import (
     UserRepository,
 )
 from services import (
+    AdjustedCoordinateService,
     ApproximateCoordinateService,
     BesselObservationService,
     ImportOrchestratorService,
@@ -223,6 +225,7 @@ def get_approximate_coordinate_service(
     reference_coordinate_repo: ReferenceCoordinateRepositoryDep,
     raw_observation_repo: RawObservationRepositoryDep,
     import_session_repo: ImportSessionRepositoryDep,
+    adjusted_coordinate_repo: AdjustedCoordinateRepositoryDep,
 ) -> ApproximateCoordinateService:
     return ApproximateCoordinateService(
         repository=repo,
@@ -232,11 +235,41 @@ def get_approximate_coordinate_service(
         repository_reference_coordinate=reference_coordinate_repo,
         repository_raw_observation=raw_observation_repo,
         repository_import_session=import_session_repo,
+        repository_adjusted_coordinate=adjusted_coordinate_repo,
     )
 
 
 ApproximateCoordinateServiceDep = Annotated[
     ApproximateCoordinateService, Depends(get_approximate_coordinate_service)
+]
+
+
+# --- Adjusted coordinates ---
+
+
+def get_adjusted_coordinate_repository(
+    db: SessionDep,
+) -> AdjustedCoordinateRepository:
+    return AdjustedCoordinateRepository(session=db)
+
+
+AdjustedCoordinateRepositoryDep = Annotated[
+    AdjustedCoordinateRepository, Depends(get_adjusted_coordinate_repository)
+]
+
+
+def get_adjusted_coordinate_service(
+    repo: AdjustedCoordinateRepositoryDep,
+    station_setup_repo: StationSetupRepositoryDep,
+) -> AdjustedCoordinateService:
+    return AdjustedCoordinateService(
+        repository=repo,
+        repository_station_setup=station_setup_repo,
+    )
+
+
+AdjustedCoordinateServiceDep = Annotated[
+    AdjustedCoordinateService, Depends(get_adjusted_coordinate_service)
 ]
 
 

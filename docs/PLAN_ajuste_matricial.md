@@ -126,31 +126,48 @@ Las 18 columnas `LargeBinary` de `StationSetup` ya existían desde `142b9835b1b5
 - `services/approximate_coordinate_service.py` — cadena MMC + persistir 18 matrices + extender `ApproximateCoordinateCalculationResult`.
 - `tests/test_approximate_pipeline.py` — afirmar que las columnas de matriz quedan pobladas.
 
+**Completados (Etapa 3):**
+- `data/database/models/adjusted_coordinate.py` — modelo joined-table `AdjustedCoordinate(Coordinate)` con `bessel_observation_id`, `prec_x`, `prec_y`.
+- Migración Alembic `dc205b516a81` — crea tabla `adjusted_coordinates`.
+- `data/repositories/adjusted_coordinate_repository.py` — CRUD + `get_by_station_setup` + `delete_by_station_setup`.
+- `api/schemas/adjusted_coordinate_schemas.py` — `AdjustedCoordinateBase`, `AdjustedCoordinateCreate`, `AdjustedCoordinateResponse`.
+- `api/dependencies.py` — DI para `AdjustedCoordinateRepository` y `AdjustedCoordinateService`.
+- `services/adjusted_coordinate_service.py` — `get_all`, `get_by_station_setup`, `get`, `count`.
+- `api/routes/adjusted_coordinate_router.py` — `GET /`, `/by-station-setup/{id}`, `/{id}`, `/count`.
+- `services/approximate_coordinate_service.py` — integración MMC: encadena `LeastSquaresAdjuster` al final del pipeline, persiste las 18 matrices y crea registros `AdjustedCoordinate`.
+- `tests/test_approximate_pipeline.py` — 4 tests de integración MMC (sin/con puntos de control, matrices, idempotencia).
+- `tests/test_adjusted_coordinate.py` — 5 tests de endpoints GET.
+- **Verificación:** 77 tests pasan (`uv run pytest -v`).
+
 ---
 
 ## Testing
 
 - **Unitarios del calculador** contra oráculos: construir `LsTarget` con los datos del Excel (ΔE/ΔN/dist/acimut de P1–P4) y verificar (a) los coeficientes de A, L y P coinciden con las celdas del Excel; (b) identidades algebraicas (`N=AᵀPA`, `x=N⁻¹AᵀPL`, `v=Ax−L`, `vᵀPv` coherente); (c) `red=0` no rompe y emite `warning`.
 - **Pipeline:** tras `calculate_for_station_setup`, leer `StationSetup` y comprobar que las 18 columnas `*_matrix` no son `None` y `from_bytes` las decodifica con shape esperada.
+- **Endpoints:** `GET /api/v1/adjusted-coordinates/by-station-setup/{id}` y `/{id}` devuelven coordenadas ajustadas con `prec_x`, `prec_y` poblados.
+- **Idempotencia:** dos runs del pipeline no duplican `AdjustedCoordinate` ni matrices.
 
 ---
 
 ## Verificación (end-to-end)
 
-1. `uv run alembic upgrade head` (ya aplicado; sin cambios de esquema).
+1. `uv run alembic upgrade head` — crea `adjusted_coordinates`.
 2. Levantar: `uv run fastapi dev main.py`.
-3. Importar un `.gka` de `docs/` vía `POST /api/v1/projects/import_gka/{id}` y luego `POST /api/v1/station-setups/{id}/approximate-coordinates`.
-4. Consultar la fila de `station_setups` en `sqlite_database/dev.db` y comprobar que `a_matrix, p_matrix, l_matrix, x_matrix, inver_n_matrix, prec_matrix, adjust_coord_matrix`, etc. están pobladas.
-5. `uv run pytest -v` (tests nuevos + regresión de Bessel/aproximadas).
+3. Importar un `.gka` de `docs/` via `POST /api/v1/projects/import_gka/{id}` y luego `POST /api/v1/station-setups/{id}/approximate-coordinates`.
+4. `GET /api/v1/adjusted-coordinates/by-station-setup/{id}` devuelve las coords ajustadas con precisiones.
+5. Consultar la fila de `station_setups` en `sqlite_database/dev.db` y comprobar que `a_matrix, p_matrix, l_matrix, x_matrix, inver_n_matrix, prec_matrix, adjust_coord_matrix`, etc. estan pobladas.
+6. `uv run pytest -v` — 77 tests (regresion + MMC + API).
 
 ---
 
 ## Progreso
 
-| Etapa | Descripción | Estado |
+| Etapa | Descripcion | Estado |
 |-------|------------|--------|
 | 1 | Modelo de precisiones + calculador puro MMC + tests | **Completada** |
-| 2 | `matrix_io.py` — serialización numpy↔bytes | **Completada** |
-| 3 | Integración en `approximate_coordinate_service` + persistencia 18 matrices | Pendiente |
+| 2 | `matrix_io.py` — serializacion numpy↔bytes | **Completada** |
+| 3 | Integracion en `approximate_coordinate_service` + persistencia 18 matrices + API | **Completada** |
 
 Ver `docs/PLAN_etapa1_calculador_mmc.md` para el desglose detallado de las tareas de la Etapa 1 (T1–T7).
+Ver `docs/PLAN_etapa3_integracion_mmc.md` para el desglose detallado de las tareas de la Etapa 3 (T1–T11).

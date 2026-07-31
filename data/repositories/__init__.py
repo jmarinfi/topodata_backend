@@ -1,3 +1,6 @@
+from data.repositories.adjusted_coordinate_repository import (
+    AdjustedCoordinateRepository,
+)
 from data.repositories.approximate_coordinate_repository import (
     ApproximateCoordinateRepository,
 )
@@ -17,6 +20,7 @@ __all__ = [
     "StationSetupRepository",
     "RawObservationRepository",
     "BesselObservationRepository",
+    "AdjustedCoordinateRepository",
     "ApproximateCoordinateRepository",
     "ReferenceCoordinateRepository",
     "UserRepository",

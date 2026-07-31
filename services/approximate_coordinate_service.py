@@ -1,7 +1,9 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from api.schemas import (
+    AdjustedCoordinateCreate,
+    AdjustedCoordinateResponse,
     ApproximateCoordinateCreate,
     ApproximateCoordinateResponse,
     ApproximateCoordinateUpdate,
@@ -12,6 +14,7 @@ from api.schemas import (
 )
 from data.database.models import Project as ProjectModel
 from data.repositories import (
+    AdjustedCoordinateRepository,
     ApproximateCoordinateRepository,
     BesselObservationRepository,
     ImportSessionRepository,
@@ -24,6 +27,12 @@ from services.calculations.approximate_coordinate_calculator import (
     ApproximateCoordinateCalculator,
     RadiacionResult,
 )
+from services.calculations.least_squares_adjuster import (
+    LeastSquaresAdjuster,
+    LeastSquaresResult,
+    LsTarget,
+)
+from services.calculations.matrix_io import scalar_to_bytes, to_bytes
 from services.calculations.station_position_calculator import StationPositionCalculator
 
 logger = logging.getLogger(__name__)
@@ -44,6 +53,13 @@ class ApproximateCoordinateCalculationResult:
     k_utm: float
     desorientacion: float
     warnings: list[str]
+    adjusted_coordinates: list[AdjustedCoordinateResponse] = field(
+        default_factory=list
+    )
+    desv_post: float | None = None
+    num_equations: int | None = None
+    num_unknowns: int | None = None
+    redundancy: int | None = None
 
 
 class ApproximateCoordinateService:
@@ -58,6 +74,7 @@ class ApproximateCoordinateService:
         repository_reference_coordinate: ReferenceCoordinateRepository,
         repository_raw_observation: RawObservationRepository,
         repository_import_session: ImportSessionRepository,
+        repository_adjusted_coordinate: AdjustedCoordinateRepository,
     ) -> None:
         self.repository = repository
         self.repository_bessel_observation = repository_bessel_observation
@@ -66,6 +83,7 @@ class ApproximateCoordinateService:
         self.repository_reference_coordinate = repository_reference_coordinate
         self.repository_raw_observation = repository_raw_observation
         self.repository_import_session = repository_import_session
+        self.repository_adjusted_coordinate = repository_adjusted_coordinate
 
     def get_approximate_coordinates(self) -> list[ApproximateCoordinateResponse]:
         approximate_coordinates = self.repository.get_all()
@@ -211,6 +229,8 @@ class ApproximateCoordinateService:
         k_0_adim = ProjectModel.K_0_ADIM
         kt_coef_refr = import_session.kt_coef_refr
         prec_ang_etr = import_session.prec_ang_etr
+        prec_dist_mm = import_session.prec_dist_mm
+        prec_dist_ppm = import_session.prec_dist_ppm
 
         # 2. Cargar observaciones y referencias.
         bessel_obs = self.repository_bessel_observation.get_by_station_setup(
@@ -331,21 +351,99 @@ class ApproximateCoordinateService:
             )
         )
 
-        # 8. Persistir etr_*, k_utm y desorientacion en el estacionamiento.
-        self.repository_station_setup.update(
-            station_setup,
-            {
-                "etr_x": etr_x,
-                "etr_y": etr_y,
-                "etr_z": etr_z,
-                "k_utm": k_utm,
-                "desorientacion": desorientacion,
-            },
+        # 8. Capturar precisiones de registros previos (antes del borrado idempotente).
+        prev_approx = self.repository.get_by_station_setup(station_setup_id)
+        prec_by_target: dict[str, tuple[float, float]] = {}
+        for c in prev_approx:
+            prec_by_target[c.target_name] = (c.prec_senal, c.prec_punteria_cc)
+
+        # 9. MMC: ajuste por mínimos cuadrados (solo puntos de control).
+        ref_names = {r.target_name for r in ref_responses}
+        control_radiaciones = [
+            r for r in radiaciones if r.target_name not in ref_names
+        ]
+
+        ls_result: LeastSquaresResult | None = None
+        if control_radiaciones:
+            ls_targets: list[LsTarget] = []
+            for r in control_radiaciones:
+                ps, pp = prec_by_target.get(r.target_name, (0.0, 3.09))
+                ls_targets.append(
+                    LsTarget(
+                        target_name=r.target_name,
+                        approx_x=r.x,
+                        approx_y=r.y,
+                        dist_utm=r.dist_utm,
+                        acimut_observado=r.acimut,
+                        prec_senal=ps,
+                        prec_punteria_cc=pp,
+                    )
+                )
+            try:
+                adjuster = LeastSquaresAdjuster(
+                    station_x=etr_x,
+                    station_y=etr_y,
+                    targets=ls_targets,
+                    gon_r=gon_r,
+                    r_cc=r_cc,
+                    s_sexa_cc=s_sexa_cc,
+                    prec_ang_etr=prec_ang_etr,
+                    prec_dist_mm=prec_dist_mm,
+                    prec_dist_ppm=prec_dist_ppm,
+                )
+                ls_result = adjuster.calculate()
+            except ValueError as e:
+                warnings.append(f"MMC falló: {e}")
+        else:
+            warnings.append(
+                "MMC omitido: no hay puntos de control (todos los visados son "
+                "referencias)."
+            )
+
+        # 10. Persistir etr_*, k_utm, desorientacion y matrices en el estacionamiento.
+        update_data = {
+            "etr_x": etr_x,
+            "etr_y": etr_y,
+            "etr_z": etr_z,
+            "k_utm": k_utm,
+            "desorientacion": desorientacion,
+        }
+        if ls_result is not None:
+            update_data.update(
+                {
+                    "v_matrix": to_bytes(ls_result.v),
+                    "a_matrix": to_bytes(ls_result.a),
+                    "tra_a_matrix": to_bytes(ls_result.tra_a),
+                    "p_matrix": to_bytes(ls_result.p),
+                    "tra_a_p_matrix": to_bytes(ls_result.tra_a_p),
+                    "x_matrix": to_bytes(ls_result.x),
+                    "l_matrix": to_bytes(ls_result.l),
+                    "n_matrix": to_bytes(ls_result.n),
+                    "inver_n_matrix": to_bytes(ls_result.inver_n),
+                    "t_matrix": to_bytes(ls_result.t),
+                    "tra_v_p_matrix": to_bytes(ls_result.tra_v_p),
+                    "prec_matrix": to_bytes(ls_result.prec),
+                    "adjust_coord_matrix": to_bytes(
+                        [(n, x, y) for n, x, y in ls_result.adjusted_coords]
+                    ),
+                    "desv_post_matrix": scalar_to_bytes(ls_result.desv_post),
+                    "var_post_matrix": scalar_to_bytes(ls_result.var_post),
+                    "num_equations_matrix": scalar_to_bytes(ls_result.num_equations),
+                    "num_unknowns_matrix": scalar_to_bytes(ls_result.num_unknowns),
+                    "inter_conf_matrix": scalar_to_bytes(ls_result.inter_conf),
+                }
+            )
+            warnings.extend(ls_result.warnings)
+
+        self.repository_station_setup.update(station_setup, update_data)
+
+        # 11. Idempotencia ampliada: borrar coords aproximadas y ajustadas previas.
+        self.repository.delete_by_station_setup(station_setup_id)
+        self.repository_adjusted_coordinate.delete_by_station_setup(
+            station_setup_id
         )
 
-        # 9. Idempotencia: borrar coordenadas aproximadas previas y reescribir.
-        self.repository.delete_by_station_setup(station_setup_id)
-
+        # 12. Recrear coordenadas aproximadas (preservando prec_senal/prec_punteria).
         persisted: list[ApproximateCoordinateResponse] = []
         for r in radiaciones:
             bessel_id: int | None = None
@@ -361,16 +459,61 @@ class ApproximateCoordinateService:
                 )
                 continue
 
+            ps, pp = prec_by_target.get(r.target_name, (0.0, 3.09))
             create_data = ApproximateCoordinateCreate(
                 target_name=r.target_name,
                 x=r.x,
                 y=r.y,
                 z=r.z,
                 bessel_observation_id=bessel_id,
+                prec_senal=ps,
+                prec_punteria_cc=pp,
             )
             coord = self.repository.create(create_data.model_dump())
             self.repository.refresh(coord)
             persisted.append(ApproximateCoordinateResponse.model_validate(coord))
+
+        # 13. Crear coordenadas ajustadas (si el MMC fue OK).
+        adjusted_responses: list[AdjustedCoordinateResponse] = []
+        if ls_result is not None:
+            for k, (name, x_adj, y_adj) in enumerate(
+                ls_result.adjusted_coords
+            ):
+                bessel_id = None
+                for bo in bessel_responses:
+                    if bo.target_name == name:
+                        bessel_id = bo.id
+                        break
+
+                if bessel_id is None:
+                    warnings.append(
+                        f"No se encontró Bessel observation para punto "
+                        f"ajustado '{name}'; se omite."
+                    )
+                    continue
+
+                z_val = 0.0
+                for r in control_radiaciones:
+                    if r.target_name == name:
+                        z_val = r.z
+                        break
+
+                adj_create = AdjustedCoordinateCreate(
+                    target_name=name,
+                    x=x_adj,
+                    y=y_adj,
+                    z=z_val,
+                    bessel_observation_id=bessel_id,
+                    prec_x=float(ls_result.prec[2 * k]),
+                    prec_y=float(ls_result.prec[2 * k + 1]),
+                )
+                coord = self.repository_adjusted_coordinate.create(
+                    adj_create.model_dump()
+                )
+                self.repository_adjusted_coordinate.refresh(coord)
+                adjusted_responses.append(
+                    AdjustedCoordinateResponse.model_validate(coord)
+                )
 
         return ApproximateCoordinateCalculationResult(
             approximate_coordinates=persisted,
@@ -380,4 +523,9 @@ class ApproximateCoordinateService:
             k_utm=k_utm,
             desorientacion=desorientacion,
             warnings=warnings,
+            adjusted_coordinates=adjusted_responses,
+            desv_post=ls_result.desv_post if ls_result else None,
+            num_equations=ls_result.num_equations if ls_result else None,
+            num_unknowns=ls_result.num_unknowns if ls_result else None,
+            redundancy=ls_result.redundancy if ls_result else None,
         )

@@ -2,6 +2,10 @@ from typing import Annotated, Union
 
 from pydantic import Field
 
+from api.schemas.adjusted_coordinate_schemas import (
+    AdjustedCoordinateCreate,
+    AdjustedCoordinateResponse,
+)
 from api.schemas.approximate_coordinate_schemas import (
     ApproximateCoordinateCreate,
     ApproximateCoordinateResponse,
@@ -52,12 +56,14 @@ from api.schemas.user_schemas import (
 
 AnyCoordinateResponse = Annotated[
     Union[
-        ReferenceCoordinateResponse, ApproximateCoordinateResponse, CoordinateResponse
+        ReferenceCoordinateResponse, ApproximateCoordinateResponse, AdjustedCoordinateResponse, CoordinateResponse
     ],
     Field(discriminator="type"),
 ]
 
 __all__ = [
+    "AdjustedCoordinateCreate",
+    "AdjustedCoordinateResponse",
     "ProjectCreate",
     "ProjectUpdate",
     "ProjectResponse",

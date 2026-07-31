@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import (
+    adjusted_coordinate_router,
     approximate_coordinate_router,
     bessel_observation_router,
     import_session_router,
@@ -40,6 +41,7 @@ app.include_router(raw_observation_router)
 app.include_router(bessel_observation_router)
 app.include_router(reference_coordinate_router)
 app.include_router(approximate_coordinate_router)
+app.include_router(adjusted_coordinate_router)
 app.include_router(user_router)
 
 

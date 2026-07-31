@@ -11,6 +11,7 @@ import math
 import pytest
 
 from data.repositories import (
+    AdjustedCoordinateRepository,
     ApproximateCoordinateRepository,
     BesselObservationRepository,
     ImportSessionRepository,
@@ -20,6 +21,7 @@ from data.repositories import (
     StationSetupRepository,
 )
 from services.approximate_coordinate_service import ApproximateCoordinateService
+from services.calculations.matrix_io import from_bytes
 
 # ---------------------------------------------------------------------- #
 # Constantes GRS80 (elipsoide del Excel)
@@ -75,6 +77,56 @@ _BESSEL_REF_DATA: list[tuple[str, float, float, float]] = [
     ("C56-R-01S", 350.6889, 107.5897, 64.695428),
     ("C56-R-02S", 352.2693, 108.2854, 59.190512),
 ]
+
+
+# ---------------------------------------------------------------------- #
+# Puntos de control (visados que NO son referencia) para tests MMC
+# (hz_bessel, v_bessel, distance_bessel) — direcciones distintas de las refs.
+# ---------------------------------------------------------------------- #
+_CONTROL_DATA: list[tuple[str, float, float, float]] = [
+    ("CTRL-01", 200.0, 100.0, 80.0),
+    ("CTRL-02", 250.0, 100.0, 100.0),
+    ("CTRL-03", 300.0, 100.0, 90.0),
+]
+
+
+def _make_control_data(
+    bessel_repo: BesselObservationRepository,
+    raw_repo: RawObservationRepository,
+    station_setup_id: int,
+) -> None:
+    """Añade observaciones Bessel (y raw obs mínimas) para puntos de control."""
+    for i, (name, hz, v, d) in enumerate(_CONTROL_DATA, start=10):
+        bessel_repo.create(
+            {
+                "station_setup_id": station_setup_id,
+                "target_name": name,
+                "hz_angle_direct": 0.0,
+                "v_angle_direct": 0.0,
+                "distance_direct": 0.0,
+                "hz_angle_inverse": 0.0,
+                "v_angle_inverse": 0.0,
+                "distance_inverse": 0.0,
+                "hz_angle_bessel": hz,
+                "v_angle_bessel": v,
+                "distance_bessel": d,
+                "hz_angle_delta": 0.0,
+                "v_angle_delta": 0.0,
+                "distance_delta": 0.0,
+            }
+        )
+        raw_repo.create(
+            {
+                "station_setup_id": station_setup_id,
+                "target_name": name,
+                "target_number": i,
+                "circle": 1,
+                "hz_angle": 0.0,
+                "v_angle": 0.0,
+                "distance_geom": 0.0,
+                "target_height": 0.0,
+            }
+        )
 
 
 # ---------------------------------------------------------------------- #
@@ -182,6 +234,7 @@ def _make_service(db) -> ApproximateCoordinateService:
         repository_reference_coordinate=ReferenceCoordinateRepository(db),
         repository_raw_observation=RawObservationRepository(db),
         repository_import_session=ImportSessionRepository(db),
+        repository_adjusted_coordinate=AdjustedCoordinateRepository(db),
     )
 
 
@@ -377,3 +430,158 @@ class TestApproximatePipeline:
         service = _make_service(db_session)
         with pytest.raises(ValueError, match="zona UTM"):
             service.calculate_for_station_setup(station_setup_id)
+
+
+class TestMMCIntegration:
+    """Pruebas de integración del MMC en el pipeline."""
+
+    def test_no_control_points_skips_mmc(self, db_session):
+        """Sin puntos de control → MMC omitido con warning, sin registros ajustados."""
+        project_id = _make_project(ProjectRepository(db_session))
+        import_session_id = _make_import_session(
+            ImportSessionRepository(db_session), project_id
+        )
+        station_setup_id = _make_station_setup(
+            StationSetupRepository(db_session), import_session_id
+        )
+
+        _make_refs(ReferenceCoordinateRepository(db_session), project_id)
+        _make_raw_obs(RawObservationRepository(db_session), station_setup_id)
+        _make_bessel_obs(BesselObservationRepository(db_session), station_setup_id)
+
+        service = _make_service(db_session)
+        result = service.calculate_for_station_setup(station_setup_id)
+
+        # Warning de MMC omitido.
+        assert any("MMC omitido" in w for w in result.warnings)
+        assert result.adjusted_coordinates == []
+        assert result.desv_post is None
+        assert result.num_equations is None
+        assert result.num_unknowns is None
+
+        # Sin registros ajustados en DB.
+        adjusted = AdjustedCoordinateRepository(db_session).get_all()
+        assert len(adjusted) == 0
+
+        # Matrices sin poblar (sin puntos de control).
+        station = StationSetupRepository(db_session).get(station_setup_id)
+        assert station.a_matrix is None
+
+    def test_matrices_populated_with_control_points(self, db_session):
+        """Con puntos de control → las 18 columnas *_matrix de StationSetup se pueblan."""
+        project_id = _make_project(ProjectRepository(db_session))
+        import_session_id = _make_import_session(
+            ImportSessionRepository(db_session), project_id
+        )
+        station_setup_id = _make_station_setup(
+            StationSetupRepository(db_session), import_session_id
+        )
+
+        _make_refs(ReferenceCoordinateRepository(db_session), project_id)
+        _make_raw_obs(RawObservationRepository(db_session), station_setup_id)
+        _make_bessel_obs(BesselObservationRepository(db_session), station_setup_id)
+        _make_control_data(
+            BesselObservationRepository(db_session),
+            RawObservationRepository(db_session),
+            station_setup_id,
+        )
+
+        service = _make_service(db_session)
+        service.calculate_for_station_setup(station_setup_id)
+
+        station = StationSetupRepository(db_session).get(station_setup_id)
+
+        matrix_cols = [
+            "a_matrix", "p_matrix", "l_matrix", "x_matrix",
+            "v_matrix", "n_matrix", "inver_n_matrix",
+            "tra_a_matrix", "tra_a_p_matrix", "t_matrix",
+            "tra_v_p_matrix", "prec_matrix", "adjust_coord_matrix",
+        ]
+        for col in matrix_cols:
+            val = getattr(station, col)
+            assert val is not None, f"{col} debería estar poblada"
+            arr = from_bytes(val)
+            assert arr.size > 0, f"{col} no debería estar vacía"
+
+        a = from_bytes(station.a_matrix)
+        n_ctrl = len(_CONTROL_DATA)
+        assert a.shape == (2 * n_ctrl, 2 * n_ctrl)
+
+        for col in (
+            "desv_post_matrix", "var_post_matrix",
+            "num_equations_matrix", "num_unknowns_matrix",
+            "inter_conf_matrix",
+        ):
+            assert getattr(station, col) is not None, f"{col} debería estar poblada"
+
+    def test_adjusted_coordinates_created(self, db_session):
+        """Con puntos de control → registros AdjustedCoordinate con x, y, prec_x, prec_y."""
+        project_id = _make_project(ProjectRepository(db_session))
+        import_session_id = _make_import_session(
+            ImportSessionRepository(db_session), project_id
+        )
+        station_setup_id = _make_station_setup(
+            StationSetupRepository(db_session), import_session_id
+        )
+
+        _make_refs(ReferenceCoordinateRepository(db_session), project_id)
+        _make_raw_obs(RawObservationRepository(db_session), station_setup_id)
+        _make_bessel_obs(BesselObservationRepository(db_session), station_setup_id)
+        _make_control_data(
+            BesselObservationRepository(db_session),
+            RawObservationRepository(db_session),
+            station_setup_id,
+        )
+
+        service = _make_service(db_session)
+        result = service.calculate_for_station_setup(station_setup_id)
+
+        control_names = {d[0] for d in _CONTROL_DATA}
+        assert len(result.adjusted_coordinates) == len(control_names)
+
+        for adj in result.adjusted_coordinates:
+            assert adj.target_name in control_names
+            assert adj.prec_x >= 0
+            assert adj.prec_y >= 0
+            assert adj.type == "adjusted"
+
+        db_adjusted = AdjustedCoordinateRepository(db_session).get_by_station_setup(
+            station_setup_id
+        )
+        assert len(db_adjusted) == len(control_names)
+
+    def test_pipeline_idempotent_with_control_points(self, db_session):
+        """Con puntos de control: dos runs no duplican matrices ni ajustadas."""
+        project_id = _make_project(ProjectRepository(db_session))
+        import_session_id = _make_import_session(
+            ImportSessionRepository(db_session), project_id
+        )
+        station_setup_id = _make_station_setup(
+            StationSetupRepository(db_session), import_session_id
+        )
+
+        _make_refs(ReferenceCoordinateRepository(db_session), project_id)
+        _make_raw_obs(RawObservationRepository(db_session), station_setup_id)
+        _make_bessel_obs(BesselObservationRepository(db_session), station_setup_id)
+        _make_control_data(
+            BesselObservationRepository(db_session),
+            RawObservationRepository(db_session),
+            station_setup_id,
+        )
+
+        service = _make_service(db_session)
+
+        result1 = service.calculate_for_station_setup(station_setup_id)
+        count_adj1 = len(result1.adjusted_coordinates)
+        count_approx1 = len(result1.approximate_coordinates)
+
+        result2 = service.calculate_for_station_setup(station_setup_id)
+        count_adj2 = len(result2.adjusted_coordinates)
+        count_approx2 = len(result2.approximate_coordinates)
+
+        assert count_adj1 == count_adj2
+        assert count_approx1 == count_approx2
+
+        # Total: 4 refs + N controles (approx) / N controles (adjusted).
+        assert count_approx1 == 4 + len(_CONTROL_DATA)
+        assert count_adj1 == len(_CONTROL_DATA)

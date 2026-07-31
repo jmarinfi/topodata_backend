@@ -1,3 +1,4 @@
+from services.adjusted_coordinate_service import AdjustedCoordinateService
 from services.approximate_coordinate_service import ApproximateCoordinateService
 from services.bessel_observation_service import BesselObservationService
 from services.import_orchestrator_service import ImportOrchestratorService
@@ -11,6 +12,7 @@ from services.token_service import TokenService
 from services.user_service import UserService
 
 __all__ = [
+    "AdjustedCoordinateService",
     "ProjectService",
     "ImportSessionService",
     "StationSetupService",

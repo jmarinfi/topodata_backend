@@ -1,3 +1,4 @@
+from data.database.models.adjusted_coordinate import AdjustedCoordinate
 from data.database.models.approximate_coordinate import ApproximateCoordinate
 from data.database.models.base import Base
 from data.database.models.bessel_observation import BesselObservation
@@ -10,6 +11,7 @@ from data.database.models.station_setup import StationSetup
 from data.database.models.user import User
 
 __all__ = [
+    "AdjustedCoordinate",
     "Base",
     "Project",
     "ImportSession",
