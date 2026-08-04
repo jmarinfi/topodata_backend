@@ -1,6 +1,6 @@
 # TopoData Backend — Referencia Completa para Agentes LLM
 
-> **Versión:** 2026-07-31 | **Lenguaje:** Python ≥ 3.14 | **Framework:** FastAPI | **ORM:** SQLAlchemy 2.0+ | **DB:** SQLite con Alembic
+> **Versión:** 2026-08-04 | **Lenguaje:** Python ≥ 3.14 | **Framework:** FastAPI | **ORM:** SQLAlchemy 2.0+ | **DB:** SQLite con Alembic
 
 ---
 
@@ -105,6 +105,9 @@ topodata_backend/
 │   ├── test_least_squares_adjuster.py # [Etapa 1] Tests unitarios MMC
 │   ├── test_matrix_io.py            # [Etapa 2] Tests de serialización numpy
 │   ├── test_adjusted_coordinate.py  # [Etapa 3] Tests HTTP de endpoints ajustados
+│   ├── test_e2e_c56_excel.py        # E2E: levantamiento C56 vs Excel (HTTP real)
+│   ├── test_e2e_s01_recompute.py    # E2E: levantamiento S01 por recálculo independiente
+│   ├── e2e_helpers.py               # Driver HTTP + oráculos de recálculo (no es test)
 │   └── bessel_tests.py              # Test manual Bessel contra DB real (no pytest)
 │
 ├── alembic/                         # Migraciones Alembic
@@ -114,9 +117,13 @@ topodata_backend/
 │       ├── bc697f509bb6_*.py        # [Etapa 1] Añade prec_dist_mm/ppm y prec_senal/prec_punteria_cc
 │       └── dc205b516a81_*.py        # [Etapa 3] Crea tabla adjusted_coordinates
 │
-├── docs/                            # Ficheros .gka de ejemplo + planes
-│   ├── 20250829_013022_20250829_013939.gka   # 1 estacionamiento
-│   ├── 20251112_200023_20251112_210627.gka   # 4 estacionamientos
+├── docs/                            # Ficheros .gka + oráculos de cálculo + planes
+│   ├── 20250829_013022_20250829_013939.gka   # 1 estacionamiento (parser/import)
+│   ├── 20251112_200023_20251112_210627.gka   # 4 estacionamientos (S01, E2E recálculo)
+│   ├── 20260121_*.gka               # Levantamiento C56 (1 estacionamiento, E2E vs Excel)
+│   ├── ajustes_topografia.py        # Implementación independiente del Colab (oráculo)
+│   ├── Cálculo coord aproximadas.xlsx / Cálculo desorientación.xlsx / Cálculo de Z del estacionamiento.xlsx
+│   ├── Pasos de cálculo v1.pdf      # Procedimiento de cálculo de referencia
 │   ├── matrices/                    # Excel de especificación del MMC
 │   ├── PLAN_ajuste_matricial.md     # Plan general del ajuste MMC
 │   ├── PLAN_etapa1_calculador_mmc.md
@@ -348,7 +355,7 @@ Todas las dependencias siguen el patrón:
 | `station_setup_router` | `/api/v1/station-setups` | `station-setups` | `GET /?import_session_id=`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204), **`POST /{id}/approximate-coordinates`** (dispara pipeline completo: Bessel + Cassini + k_utm + ZEST + desorientación + radiación + MMC) |
 | `raw_observation_router` | `/api/v1/raw-observations` | `raw-observations` | `GET /?station_setup_id=`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204) |
 | `bessel_observation_router` | `/api/v1/bessel-observations` | `bessel-observations` | `GET /?station_setup_id=`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204) |
-| `approximate_coordinate_router` | `/api/v1/approximate-coordinates` | `approximate-coordinates` | `GET /`, `/by-bessel-observation/{id}`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204) |
+| `approximate_coordinate_router` | `/api/v1/approximate-coordinates` | `approximate-coordinates` | `GET /`, `/by-station-setup/{id}`, `/by-bessel-observation/{id}`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204) |
 | `adjusted_coordinate_router` | `/api/v1/adjusted-coordinates` | `adjusted-coordinates` | **Etapa 3**. **Solo lectura**: `GET /`, `/by-station-setup/{id}`, `/{id}`, `/count` (todos con `_: CurrentUser`). |
 | `reference_coordinate_router` | `/api/v1/reference-coordinates` | `reference-coordinates` | `GET /?project_id=`, `/count`, `/{id}`, `POST /`, `PUT /{id}`, `DELETE /{id}` (204) |
 | `user_router` | `/api/v1` | `auth` | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `GET /users`, `GET /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` (204) |
@@ -532,17 +539,20 @@ Project
   - `db_session` → sesión SQLAlchemy directa sobre SQLite en memoria (para tests de servicio)
   - `client` → `TestClient` con `get_db` sobreescrito a DB en memoria
   - `auth_client` → `client` con token JWT (usuario `tester` registrado y autenticado)
-- **Tests existentes (77 totales):**
+- **Tests existentes (86 totales):**
   - `test_auth.py` → 401 sin token, 200 con token
   - `test_gka_parser.py` → parseo de 1 estación y 4 estaciones
   - `test_bessel_adjuster.py` → par sintético directo+inverso, error sin par inverso
-  - `test_import_orchestrator.py` → import OK, dedup mismo proyecto, permitido distinto proyecto
+  - `test_import_orchestrator.py` → import OK + deduplicación por proyecto
   - `test_station_position.py` → **Etapa 1**: oracles Excel de resección, k_utm, ZEST
   - `test_approximate_coordinate.py` → **Etapa 1**: oracles de desorientación y radiación
   - `test_approximate_pipeline.py` → Pipeline completo + **Etapa 3**: integración MMC (`TestMMCIntegration`)
   - `test_least_squares_adjuster.py` → **Etapa 1**: tests unitarios MMC (identidades algebraicas, redundancia, etc.)
   - `test_matrix_io.py` → **Etapa 2**: round-trip numpy↔bytes
   - `test_adjusted_coordinate.py` → **Etapa 3**: tests HTTP de `GET /api/v1/adjusted-coordinates/*`
+  - `test_e2e_c56_excel.py` → **E2E**: importa el levantamiento C56 por HTTP y verifica cada etapa contra los Excel (resección, k_utm, ZEST, desorientación, radiación, MMC sobre los 3 controles)
+  - `test_e2e_s01_recompute.py` → **E2E**: importa el levantamiento S01 (4 estacionamientos) por HTTP y verifica cada etapa por recálculo independiente + comprueba el álgebra de las matrices MMC persistidas (`TestE2ES01MmcMatrices`)
+  - `e2e_helpers.py` → helpers compartidos de los E2E (driver HTTP + oráculos de recálculo); no sigue el patrón `test_*` así que pytest no lo recoge
   - `bessel_tests.py` → test manual (no pytest) contra DB real
 
 ---
@@ -633,6 +643,9 @@ uv run pytest -v
 # Solo tests del MMC
 uv run pytest tests/test_least_squares_adjuster.py tests/test_matrix_io.py tests/test_approximate_pipeline.py::TestMMCIntegration tests/test_adjusted_coordinate.py -v
 
+# Tests E2E (importación + cálculo por HTTP real contra oráculos)
+uv run pytest tests/test_e2e_c56_excel.py tests/test_e2e_s01_recompute.py -v
+
 # Crear usuario (script independiente)
 uv run python create_user.py
 
@@ -666,6 +679,8 @@ uv run python create_user.py
 | 1 | Modelo de precisiones + calculador puro MMC + tests | **Completada** |
 | 2 | `matrix_io.py` — serialización numpy↔bytes | **Completada** |
 | 3 | Integración en `approximate_coordinate_service` + persistencia 18 matrices + API REST | **Completada** |
+
+Además, se añadieron los tests **E2E** (`test_e2e_c56_excel.py`, `test_e2e_s01_recompute.py`) que recorren el flujo HTTP completo y verifican cada etapa contra oráculos independientes (Excel y recálculo propio), incluido el álgebra de las matrices MMC persistidas.
 
 Planes detallados:
 - `docs/PLAN_etapa1_calculador_mmc.md` — Tareas T1–T7

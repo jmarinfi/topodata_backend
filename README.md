@@ -48,6 +48,7 @@ topodata_backend/
 │   │       ├── bessel_observation.py # BesselObservation (12 columnas: dir+inv+bessel+delta)
 │   │       ├── coordinate.py     #   Coordinate (polimórfica joined-table, discriminator "type")
 │   │       ├── approximate_coordinate.py # ApproximateCoordinate (FK→bessel_observations)
+│   │       ├── adjusted_coordinate.py    #   AdjustedCoordinate (FK→bessel_observations) [MMC]
 │   │       ├── reference_coordinate.py   # ReferenceCoordinate (FK→projects)
 │   │       └── user.py           #   User (bcrypt hash, is_active, is_superuser)
 │   └── repositories/             # Patrón Repository (BaseRepository[T] genérico)
@@ -58,6 +59,7 @@ topodata_backend/
 │       ├── raw_observation_repository.py # get_by_station_setup, delete_by_station_setup (bulk)
 │       ├── bessel_observation_repository.py
 │       ├── approximate_coordinate_repository.py # get_by_bessel_observation, delete_by_station_setup
+│       ├── adjusted_coordinate_repository.py    # get_by_bessel_observation, delete_by_station_setup [MMC]
 │       ├── reference_coordinate_repository.py   # get_by_project
 │       └── user_repository.py            # get_by_username, get_by_email, exists_by_*
 │
@@ -71,6 +73,7 @@ topodata_backend/
 │   │   ├── bessel_observation_router.py
 │   │   ├── reference_coordinate_router.py
 │   │   ├── approximate_coordinate_router.py
+│   │   ├── adjusted_coordinate_router.py  #   [MMC] Solo lectura: /api/v1/adjusted-coordinates
 │   │   └── user_router.py        #   /auth/register, /auth/login, /auth/me, /users
 │   └── schemas/                  # Schemas Pydantic v2 (Base/Create/Update/Response/Parsed)
 │       ├── project_schemas.py    #   ProjectBase con @model_validator para derivar elipsoide
@@ -80,6 +83,7 @@ topodata_backend/
 │       ├── bessel_observation_schemas.py
 │       ├── coordinate_schemas.py #   CoordinateBase polimórfico
 │       ├── approximate_coordinate_schemas.py
+│       ├── adjusted_coordinate_schemas.py #   [MMC] AdjustedCoordinateBase/Create/Response
 │       ├── reference_coordinate_schemas.py
 │       ├── user_schemas.py       #   UserCreate/Update/Response + LoginRequest + TokenResponse
 │       └── parser_schemas.py     #   GkaImportResult
@@ -91,7 +95,8 @@ topodata_backend/
 │   ├── station_setup_service.py  # CRUD estacionamientos + borrado en cascada de hijos
 │   ├── raw_observation_service.py
 │   ├── bessel_observation_service.py  # CRUD + cálculo Bessel automático (idempotente)
-│   ├── approximate_coordinate_service.py # CRUD + cálculo de coordenadas aproximadas
+│   ├── approximate_coordinate_service.py # CRUD + pipeline completo (Cassini → MMC)
+│   ├── adjusted_coordinate_service.py    # [MMC] Solo lectura de coordenadas ajustadas
 │   ├── reference_coordinate_service.py
 │   ├── user_service.py           # register, login (JWT), CRUD usuarios
 │   ├── password_service.py       # bcrypt hash/verify
@@ -104,7 +109,9 @@ topodata_backend/
 │   └── calculations/
 │       ├── bessel_adjuster.py    # Cálculo de promedios Bessel (pandas pivot_table + numpy)
 │       ├── station_position_calculator.py # Inversa planimétrica, k_utm, cota estación (ZEST)
-│       └── approximate_coordinate_calculator.py # Desorientación + radiación de coordenadas
+│       ├── approximate_coordinate_calculator.py # Desorientación + radiación de coordenadas
+│       ├── least_squares_adjuster.py   # [MMC] Ajuste por mínimos cuadrados (numpy)
+│       └── matrix_io.py               # [MMC] Serialización numpy↔bytes (18 matrices)
 │
 ├── tests/
 │   ├── conftest.py               # Fixtures: DB SQLite en memoria, client, auth_client
@@ -115,7 +122,13 @@ topodata_backend/
 │   ├── test_approximate_coordinate.py
 │   ├── test_approximate_pipeline.py
 │   ├── test_station_position.py
-│   └── bessel_tests.py           # Test manual Bessel contra DB real (no pytest)
+│   ├── test_least_squares_adjuster.py # [MMC] Tests unitarios del ajuste
+│   ├── test_matrix_io.py          # [MMC] Round-trip numpy↔bytes
+│   ├── test_adjusted_coordinate.py # [MMC] Tests HTTP de endpoints ajustados
+│   ├── test_e2e_c56_excel.py      # E2E: levantamiento C56 vs Excel
+│   ├── test_e2e_s01_recompute.py  # E2E: levantamiento S01 por recálculo
+│   ├── e2e_helpers.py             # Driver HTTP + oráculos de recálculo (no test)
+│   └── bessel_tests.py            # Test manual Bessel contra DB real (no pytest)
 │
 ├── alembic/
 │   ├── env.py                    # target_metadata = Base.metadata
@@ -123,8 +136,12 @@ topodata_backend/
 │
 ├── docs/
 │   ├── LLM-REFERENCE.md          # Referencia completa para agentes LLM
-│   ├── ajustes_topografia.py     # Cálculos de referencia (oráculo)
-│   └── *.gka                     # Ficheros .gka de ejemplo para tests
+│   ├── ajustes_topografia.py     # Implementación independiente del Colab (oráculo de tests)
+│   ├── *.gka                     # Ficheros .gka de ejemplo para tests (C56, S01, etc.)
+│   ├── matrices/                 # Excel de especificación del MMC
+│   ├── Cálculo coord aproximadas.xlsx / Cálculo desorientación.xlsx / Cálculo de Z del estacionamiento.xlsx
+│   ├── Pasos de cálculo v1.pdf   # Procedimiento de cálculo de referencia
+│   └── PLAN_*.md                 # Planes del ajuste matricial (etapas 1-3)
 │
 └── sqlite_database/              # Directorio de la BD SQLite (dev.db)
 ```
@@ -220,10 +237,14 @@ uv run fastapi dev main.py
 | `POST` | `/api/v1/projects/import_gka/{id}` | Importar archivo .gka (multipart) |
 | `GET` | `/api/v1/import-sessions` | Listar sesiones (filtro: `?project_id=`) |
 | `GET` | `/api/v1/station-setups` | Listar estacionamientos (filtro: `?import_session_id=`) |
+| `POST` | `/api/v1/station-setups/{id}/approximate-coordinates` | Dispara el pipeline completo (Cassini → k_utm → ZEST → desorientación → radiación → MMC) |
 | `GET` | `/api/v1/raw-observations` | Listar observaciones brutas (filtro: `?station_setup_id=`) |
 | `GET` | `/api/v1/bessel-observations` | Listar observaciones Bessel (filtro: `?station_setup_id=`) |
 | `GET` | `/api/v1/reference-coordinates` | Listar coordenadas de referencia (filtro: `?project_id=`) |
 | `GET` | `/api/v1/approximate-coordinates` | Listar coordenadas aproximadas |
+| `GET` | `/api/v1/approximate-coordinates/by-station-setup/{id}` | Coordenadas aproximadas de un estacionamiento |
+| `GET` | `/api/v1/adjusted-coordinates` | Listar coordenadas ajustadas por MMC |
+| `GET` | `/api/v1/adjusted-coordinates/by-station-setup/{id}` | Coordenadas ajustadas de un estacionamiento |
 
 > Todos los endpoints tienen `POST`, `PUT`, `DELETE` y `/count` además de `GET`. Consulta `/docs` para el esquema completo.
 
@@ -251,20 +272,53 @@ ImportOrchestratorService.process_gka_import()
 
 ---
 
+## 🔄 Pipeline de Coordenadas Aproximadas + MMC
+
+Disparado por `POST /api/v1/station-setups/{id}/approximate-coordinates` (sin body). Es **idempotente** (borra y reescribe aproximadas y ajustadas previas) y de **fallo suave** (si el MMC falla, añade warning y sigue con las aproximadas).
+
+```
+1. Cargar entidades (station_setup, import_session, project, bessel, raw, refs)
+   └─ ValueError si falta alguna o hay < 3 referencias
+
+2. Resección Cassini → (etr_x, etr_y)
+3. k_utm = factor de escala UTM
+4. ZEST → etr_z (cota de la estación)
+5. Desorientación (ε) del estacionamiento
+6. Radiación → coordenadas aproximadas por cada observación Bessel
+
+7. MMC (mínimos cuadrados) sobre los puntos de control (no referencias):
+   ├─ LeastSquaresAdjuster (A, Aᵀ, P, N=AᵀPA, N⁻¹, x, v, precisiones)
+   ├─ Persiste 18 matrices numpy en StationSetup (columnas LargeBinary)
+   └─ Crea un AdjustedCoordinate por punto de control (x, y, z, prec_x, prec_y)
+
+8. Recrea ApproximateCoordinate preservando prec_senal / prec_punteria_cc
+9. Devuelve ApproximateCoordinateCalculationResult (aproximadas + ajustadas + warnings)
+```
+
+---
+
 ## 🧪 Tests
 
 ```bash
-# Ejecutar todos los tests
+# Ejecutar todos los tests (86 actualmente)
 uv run pytest
 
 # Ejecutar tests específicos
 uv run pytest tests/test_gka_parser.py -v
+
+# Solo tests del MMC
+uv run pytest tests/test_least_squares_adjuster.py tests/test_matrix_io.py tests/test_adjusted_coordinate.py -v
+
+# Tests E2E (importación + cálculo por HTTP real contra oráculos)
+uv run pytest tests/test_e2e_c56_excel.py tests/test_e2e_s01_recompute.py -v
 ```
 
 Los tests usan **SQLite en memoria** (no tocan `dev.db`). Las fixtures en `conftest.py` proporcionan:
 - `client`: `TestClient` con DB aislada
 - `auth_client`: `client` con token JWT (usuario `tester` / `supersecret`)
 - `db_session`: sesión SQLAlchemy directa para tests de servicio
+
+Los tests **E2E** (`test_e2e_c56_excel.py` y `test_e2e_s01_recompute.py`) recorren el flujo HTTP real (proyecto → referencias → importación GKA → cálculo) y verifican cada etapa contra **oráculos independientes**: los Excel de referencia (levantamiento C56) y un recálculo independiente de la lógica del Colab (`docs/ajustes_topografia.py` + helpers en `tests/e2e_helpers.py`).
 
 ---
 
@@ -291,7 +345,8 @@ Los tests usan **SQLite en memoria** (no tocan `dev.db`). Las fixtures en `conft
 - **Fallo suave en Bessel:** Si un estacionamiento no tiene pares directo/inverso válidos, el cálculo Bessel se omite (warning) pero la importación NO aborta.
 - **Deduplicación de importaciones:** `UniqueConstraint(project_id, content_hash)` en `ImportSession`. El mismo archivo PUEDE importarse en distintos proyectos.
 - **Ángulos en gon:** Todos los ángulos usan el sistema centesimal (0-400 gon). El proyecto usa constantes como `GON_R = π/200`.
-- **Coordenadas con herencia joined-table:** `Coordinate` es la tabla padre; `ApproximateCoordinate` y `ReferenceCoordinate` son tablas hijas. El borrado bulk de coordenadas aproximadas debe borrar también la fila padre.
+- **Coordenadas con herencia joined-table:** `Coordinate` es la tabla padre; `ApproximateCoordinate`, `AdjustedCoordinate` y `ReferenceCoordinate` son tablas hijas. El borrado bulk de cada hija debe borrar también la fila padre en `Coordinate`.
+- **MMC (mínimos cuadrados):** `LeastSquaresAdjuster` calcula la cadena `A → Aᵀ → P → N=AᵀPA → N⁻¹ → x → v` para los puntos de control. Los 18 resultados se serializan con `matrix_io` y se persisten en `StationSetup` como `LargeBinary`, y se crea un `AdjustedCoordinate` consultable por cada control.
 
 ---
 
@@ -300,10 +355,11 @@ Los tests usan **SQLite en memoria** (no tocan `dev.db`). Las fixtures en `conft
 ```
 Project
  └─ ImportSession          ← UniqueConstraint(project_id, content_hash)
-      └─ StationSetup      ← matrices binarias LargeBinary
+      └─ StationSetup      ← matrices binarias LargeBinary (MMC)
            ├─ RawObservation
            ├─ BesselObservation
-           └─ ApproximateCoordinate → Coordinate (joined-table)
+           ├─ ApproximateCoordinate → Coordinate (joined-table)
+           └─ AdjustedCoordinate → Coordinate (joined-table) [MMC]
 ReferenceCoordinate → Coordinate (independiente, cuelga de Project)
 ```
 
@@ -314,7 +370,9 @@ El borrado es **siempre manual y explícito** de arriba hacia abajo.
 ## 📚 Documentación Adicional
 
 - **`docs/LLM-REFERENCE.md`**: Referencia exhaustiva para agentes LLM con catálogo completo de clases, funciones, flujos y patrones.
-- **`docs/ajustes_topografia.py`**: Cálculos topográficos de referencia (oráculo para validar resultados).
+- **`docs/ajustes_topografia.py`**: Implementación independiente de la lógica del Colab (oráculo para validar resultados en los tests E2E).
+- **`docs/PLAN_ajuste_matricial.md`**: Plan general del ajuste por mínimos cuadrados (MMC) — etapas 1-3 completadas.
+- **`docs/matrices/` + Excel de cálculo**: Especificación del MMC y valores de referencia para verificar los resultados.
 - **`http://127.0.0.1:8000/docs`**: Documentación interactiva Swagger UI auto-generada.
 
 ---
@@ -328,5 +386,6 @@ uv run alembic upgrade head      # Aplicar migraciones pendientes
 uv run alembic revision --autogenerate -m "descripción"  # Crear nueva migración
 uv run pytest                    # Ejecutar tests
 uv run pytest -v                 # Ejecutar tests con output detallado
+uv run pytest tests/test_e2e_c56_excel.py tests/test_e2e_s01_recompute.py -v  # Tests E2E
 uv run python create_user.py     # Crear usuario interactivo
 ```
