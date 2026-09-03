@@ -9,6 +9,7 @@ from api.schemas import (
     StationSetupResponse,
 )
 from data.repositories import (
+    AdjustedCoordinateRepository,
     ApproximateCoordinateRepository,
     BesselObservationRepository,
     RawObservationRepository,
@@ -42,11 +43,13 @@ class BesselObservationService:
         repository_station_setup: StationSetupRepository,
         repository_raw_observation: RawObservationRepository,
         repository_approximate_coordinate: ApproximateCoordinateRepository,
+        repository_adjusted_coordinate: AdjustedCoordinateRepository,
     ) -> None:
         self.repository = repository
         self.repository_station_setup = repository_station_setup
         self.repository_raw_observation = repository_raw_observation
         self.repository_approximate_coordinate = repository_approximate_coordinate
+        self.repository_adjusted_coordinate = repository_adjusted_coordinate
 
     def get_bessel_observations(self) -> list[BesselObservationResponse]:
         bessel_observations = self.repository.get_all()
@@ -178,11 +181,10 @@ class BesselObservationService:
             logger.warning(msg)
             return BesselCalculationResult(bessel_observations=[], warning=msg)
 
-        # Idempotencia: cascade hacia abajo (approx -> bessel), mismo orden
-        # que StationSetupService._delete_station_setup_children.
-        self.repository_approximate_coordinate.delete_by_station_setup(
-            station_setup_id
-        )
+        # Idempotencia: cascade hacia abajo (adjusted/approx -> bessel), mismo
+        # orden que StationSetupService._delete_station_setup_children.
+        self.repository_adjusted_coordinate.delete_by_station_setup(station_setup_id)
+        self.repository_approximate_coordinate.delete_by_station_setup(station_setup_id)
         self.repository.delete_by_station_setup(station_setup_id)
 
         persisted: list[BesselObservationResponse] = []

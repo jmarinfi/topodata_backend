@@ -107,6 +107,7 @@ def get_station_setup_service(
     raw_observation_repo: RawObservationRepositoryDep,
     bessel_observation_repo: BesselObservationRepositoryDep,
     approximate_coordinate_repo: ApproximateCoordinateRepositoryDep,
+    adjusted_coordinate_repo: AdjustedCoordinateRepositoryDep,
 ) -> StationSetupService:
     return StationSetupService(
         repository=repo,
@@ -114,6 +115,7 @@ def get_station_setup_service(
         repository_raw_observation=raw_observation_repo,
         repository_bessel_observation=bessel_observation_repo,
         repository_approximate_coordinate=approximate_coordinate_repo,
+        repository_adjusted_coordinate=adjusted_coordinate_repo,
     )
 
 
@@ -164,12 +166,14 @@ def get_bessel_observation_service(
     station_setup_repo: StationSetupRepositoryDep,
     raw_observation_repo: RawObservationRepositoryDep,
     approximate_coordinate_repo: ApproximateCoordinateRepositoryDep,
+    adjusted_coordinate_repo: AdjustedCoordinateRepositoryDep,
 ) -> BesselObservationService:
     return BesselObservationService(
         repository=repo,
         repository_station_setup=station_setup_repo,
         repository_raw_observation=raw_observation_repo,
         repository_approximate_coordinate=approximate_coordinate_repo,
+        repository_adjusted_coordinate=adjusted_coordinate_repo,
     )
 
 

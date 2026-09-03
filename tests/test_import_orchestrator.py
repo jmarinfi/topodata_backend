@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from data.repositories import (
+    AdjustedCoordinateRepository,
     ApproximateCoordinateRepository,
     BesselObservationRepository,
     ImportSessionRepository,
@@ -45,8 +46,9 @@ def _orchestrator(db) -> ImportOrchestratorService:
     obs_repo = RawObservationRepository(db)
     bessel_repo = BesselObservationRepository(db)
     approx_repo = ApproximateCoordinateRepository(db)
+    adjusted_repo = AdjustedCoordinateRepository(db)
     bessel_service = BesselObservationService(
-        bessel_repo, station_repo, obs_repo, approx_repo
+        bessel_repo, station_repo, obs_repo, approx_repo, adjusted_repo
     )
     return ImportOrchestratorService(
         import_repo, station_repo, obs_repo, bessel_service

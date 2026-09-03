@@ -222,7 +222,7 @@ def _setup_s01_first_station(db_session) -> tuple[StationSetupRepository, int]:
     adjusted_repo = AdjustedCoordinateRepository(db_session)
 
     bessel_service = BesselObservationService(
-        bessel_repo, station_repo, obs_repo, approx_repo
+        bessel_repo, station_repo, obs_repo, approx_repo, adjusted_repo
     )
     orchestrator = ImportOrchestratorService(
         import_repo, station_repo, obs_repo, bessel_service
