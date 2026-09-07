@@ -36,9 +36,11 @@ class RadiacionResult:
 class ApproximateCoordinateCalculator:
     """Desorientación del estacionamiento y coordenadas aproximadas (radiación).
 
-    Equivalente al ``AproxCoordsAdjuster`` de ``docs/ajustes_topografia.py``.
-    La desorientación se calcula aquí (B2.5); la radiación de coordenadas se
-    añade en B2.6.
+    La desorientación es puerto del ``AproxCoordsAdjuster`` de
+    ``docs/ajustes_topografia.py`` (B2.5). La radiación (B2.6) sigue los
+    Excel v2 (``Cálculo distancias reducidas v2.xlsx`` y ``Cálculo coord
+    aproximadas v2.xlsx``): el Colab y el Excel antiguo mezclaban cc sobre
+    gones en la reducción al horizonte.
     """
 
     @staticmethod
@@ -109,10 +111,15 @@ class ApproximateCoordinateCalculator:
         earth_radius: float,
         r_cc: float,
         kt_coef_refr: float,
+        instrument_height: float = 0.0,
+        target_height: float = 0.0,
     ) -> RadiacionResult:
         """Radiación de una única observación Bessel → coordenada aproximada.
 
-        Puerto del método ``_calculate_coordenada_aproximada`` del Colab.
+        Puerto de la columna I de ``Cálculo distancias reducidas v2.xlsx`` y
+        de las columnas H-L de ``Cálculo coord aproximadas v2.xlsx`` (el
+        ``_calculate_coordenada_aproximada`` del Colab y el Excel antiguo
+        sumaban w y r en cc sobre un ángulo vertical en gon).
         Calcula las coordenadas (x, y, z) de un punto observado a partir de
         la posición de la estación, el factor de escala UTM, la desorientación
         y los ángulos/distancias Bessel.
@@ -135,6 +142,10 @@ class ApproximateCoordinateCalculator:
             Factor de conversión radianes → cc (2000000/π).
         kt_coef_refr:
             Coeficiente de refracción (valor por defecto: 0.13).
+        instrument_height:
+            altura del instrumento i (m).
+        target_height:
+            altura de mira m (m).
         """
         d = bessel.distance_bessel
         v = bessel.v_angle_bessel
@@ -144,9 +155,12 @@ class ApproximateCoordinateCalculator:
         w_cc = d * r_cc / earth_radius
         r_cc_val = kt_coef_refr * w_cc
 
-        # Distancia reducida al horizonte de la estación.
+        # Distancia reducida al horizonte de la estación. w y r están en cc:
+        # 1 gon = 10000 cc (Excel v2, col. I).
         dist_hor = (
-            d * math.sin((v - w_cc + r_cc_val) * gon_r) / math.cos((w_cc / 2.0) * gon_r)
+            d
+            * math.sin((v + (r_cc_val - w_cc) / 10000.0) * gon_r)
+            / math.cos((w_cc / 20000.0) * gon_r)
         )
 
         # Reducción al elipsoide.
@@ -163,8 +177,14 @@ class ApproximateCoordinateCalculator:
         x = etr_x + dist_utm * math.sin(acimut * gon_r)
         y = etr_y + dist_utm * math.cos(acimut * gon_r)
 
-        # Cota del punto (desnivel + corrección conjunta curvatura/refracción).
-        z = d * math.cos(v * gon_r) + (0.5 - kt_coef_refr) * d**2 / earth_radius + etr_z
+        # Cota del punto: desnivel + corrección curvatura/refracción + i − m.
+        z = (
+            d * math.cos(v * gon_r)
+            + (0.5 - kt_coef_refr) * d**2 / earth_radius
+            + etr_z
+            + instrument_height
+            - target_height
+        )
 
         return RadiacionResult(
             target_name=bessel.target_name,
@@ -191,11 +211,17 @@ class ApproximateCoordinateCalculator:
         earth_radius: float,
         r_cc: float,
         kt_coef_refr: float,
+        instrument_height: float = 0.0,
+        target_height_by_target: dict[str, float] | None = None,
     ) -> list[RadiacionResult]:
         """Radiación de todas las observaciones Bessel de un estacionamiento.
 
         Devuelve una coordenada aproximada por cada observación Bessel.
+        ``instrument_height`` es la altura de instrumento (i) común y
+        ``target_height_by_target`` da la altura de mira (m) por objetivo
+        (0 si falta), ambas para la cota.
         """
+        heights = target_height_by_target or {}
         return [
             ApproximateCoordinateCalculator.calculate_radiacion(
                 bessel=b,
@@ -208,6 +234,8 @@ class ApproximateCoordinateCalculator:
                 earth_radius=earth_radius,
                 r_cc=r_cc,
                 kt_coef_refr=kt_coef_refr,
+                instrument_height=instrument_height,
+                target_height=heights.get(b.target_name, 0.0),
             )
             for b in bessel_observations
         ]

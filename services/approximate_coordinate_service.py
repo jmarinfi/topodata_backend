@@ -53,9 +53,7 @@ class ApproximateCoordinateCalculationResult:
     k_utm: float
     desorientacion: float
     warnings: list[str]
-    adjusted_coordinates: list[AdjustedCoordinateResponse] = field(
-        default_factory=list
-    )
+    adjusted_coordinates: list[AdjustedCoordinateResponse] = field(default_factory=list)
     desv_post: float | None = None
     num_equations: int | None = None
     num_unknowns: int | None = None
@@ -181,6 +179,11 @@ class ApproximateCoordinateService:
         del pipeline (Cassini → k_utm → Z → desorientación → radiación),
         persiste los resultados en el estacionamiento y las coordenadas
         aproximadas, y devuelve el resultado.
+
+        La radiación suma a la cota la altura de instrumento del
+        estacionamiento (``station_height``) menos la altura de mira de la
+        observación cruda del objetivo (``target_height``), término ``+i−m``
+        de los Excel v2.
 
         Es **idempotente**: las coordenadas aproximadas previas del
         estacionamiento se borran y se reescriben.
@@ -336,6 +339,13 @@ class ApproximateCoordinateService:
         desorientacion = desorientacion_result.desorientacion
 
         # 7. Etapa 5: radiación → coordenadas aproximadas.
+        # Alturas para la cota: i de la estación; m de la primera observación
+        # cruda de cada objetivo (0 si falta), igual que en ZEST.
+        instrument_height = station_setup.station_height or 0.0
+        target_height_by_target: dict[str, float] = {}
+        for o in raw_responses:
+            target_height_by_target.setdefault(o.target_name, o.target_height or 0.0)
+
         radiaciones: list[RadiacionResult] = (
             ApproximateCoordinateCalculator.calculate_all_radiaciones(
                 bessel_observations=bessel_responses,
@@ -348,6 +358,8 @@ class ApproximateCoordinateService:
                 earth_radius=earth_radius,
                 r_cc=r_cc,
                 kt_coef_refr=kt_coef_refr,
+                instrument_height=instrument_height,
+                target_height_by_target=target_height_by_target,
             )
         )
 
@@ -359,9 +371,7 @@ class ApproximateCoordinateService:
 
         # 9. MMC: ajuste por mínimos cuadrados (solo puntos de control).
         ref_names = {r.target_name for r in ref_responses}
-        control_radiaciones = [
-            r for r in radiaciones if r.target_name not in ref_names
-        ]
+        control_radiaciones = [r for r in radiaciones if r.target_name not in ref_names]
 
         ls_result: LeastSquaresResult | None = None
         if control_radiaciones:
@@ -439,9 +449,7 @@ class ApproximateCoordinateService:
 
         # 11. Idempotencia ampliada: borrar coords aproximadas y ajustadas previas.
         self.repository.delete_by_station_setup(station_setup_id)
-        self.repository_adjusted_coordinate.delete_by_station_setup(
-            station_setup_id
-        )
+        self.repository_adjusted_coordinate.delete_by_station_setup(station_setup_id)
 
         # 12. Recrear coordenadas aproximadas (preservando prec_senal/prec_punteria).
         persisted: list[ApproximateCoordinateResponse] = []
@@ -476,9 +484,7 @@ class ApproximateCoordinateService:
         # 13. Crear coordenadas ajustadas (si el MMC fue OK).
         adjusted_responses: list[AdjustedCoordinateResponse] = []
         if ls_result is not None:
-            for k, (name, x_adj, y_adj) in enumerate(
-                ls_result.adjusted_coords
-            ):
+            for k, (name, x_adj, y_adj) in enumerate(ls_result.adjusted_coords):
                 bessel_id = None
                 for bo in bessel_responses:
                     if bo.target_name == name:

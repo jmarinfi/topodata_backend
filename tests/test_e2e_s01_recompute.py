@@ -163,6 +163,8 @@ class TestE2ES01Recompute:
             exp_r = recompute_radiation(
                 bessel, station["etr_x"], station["etr_y"], station["etr_z"],
                 station["k_utm"], station["desorientacion"],
+                instrument_height=station.get("station_height") or 0.0,
+                target_height_by_name=th_by,
             )
             for name, (x, y, zv) in exp_r.items():
                 g = approx_by[name]

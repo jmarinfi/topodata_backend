@@ -218,15 +218,24 @@ def recompute_radiation(
     k_utm: float,
     desorientacion: float,
     kt_coef_refr: float = _KT_COEF_REFR,
+    instrument_height: float = 0.0,
+    target_height_by_name: dict[str, float] | None = None,
 ) -> dict[str, tuple[float, float, float]]:
-    """Recalcula las coordenadas aproximadas (radiación) con la fórmula del Colab.
+    """Recalcula las coordenadas aproximadas (radiación) según los Excel v2.
 
     ``bessel_obs``: lista de dicts con ``target_name``, ``hz_angle_bessel``,
     ``v_angle_bessel`` y ``distance_bessel`` (gon / metros).
 
+    ``instrument_height`` es la altura de instrumento (i) y
+    ``target_height_by_name`` la altura de mira (m) por objetivo (0 si
+    falta); ambos entran en la cota como el término +i−m.
+
     Devuelve ``{target_name: (x, y, z)}``. Reimplementación independiente de
-    ``AproxCoordsAdjuster._calculate_coordenada_aproximada``.
+    la cadena de ``Cálculo distancias reducidas v2.xlsx`` (reducción al
+    horizonte con conversión cc→gon: 1 gon = 10000 cc) y ``Cálculo coord
+    aproximadas v2.xlsx``.
     """
+    heights = target_height_by_name or {}
     out: dict[str, tuple[float, float, float]] = {}
     for b in bessel_obs:
         d = b["distance_bessel"]
@@ -237,8 +246,8 @@ def recompute_radiation(
         r_cc_v = kt_coef_refr * w_cc
         dist_hor = (
             d
-            * math.sin((v - w_cc + r_cc_v) * _GON_R)
-            / math.cos((w_cc / 2.0) * _GON_R)
+            * math.sin((v + (r_cc_v - w_cc) / 10000.0) * _GON_R)
+            / math.cos((w_cc / 20000.0) * _GON_R)
         )
         dist_elip = dist_hor * _EARTH_RADIUS / (_EARTH_RADIUS + etr_z)
         dist_utm = dist_elip * k_utm
@@ -252,6 +261,8 @@ def recompute_radiation(
             d * math.cos(v * _GON_R)
             + (0.5 - kt_coef_refr) * d * d / _EARTH_RADIUS
             + etr_z
+            + instrument_height
+            - heights.get(b["target_name"], 0.0)
         )
         out[b["target_name"]] = (x, y, z)
     return out

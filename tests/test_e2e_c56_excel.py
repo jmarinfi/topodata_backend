@@ -9,9 +9,10 @@ Flujo real por HTTP (endpoint de importación hasta hoy sin cubrir):
 
 Los 15 puntos con coordenada conocida del C56 y los valores esperados
 (etr, k_utm, etr_z, desorientación, coords aproximadas) se transcriben de los
-Excel ``Cálculo parámetros v2``, ``Cálculo Desorientación``, ``Cálculo Zest`` y
-``Cálculo coord aproximadas`` (los mismos que ya usan ``test_station_position``
-y ``test_approximate_coordinate``).
+Excel ``Cálculo parámetros v2``, ``Cálculo Desorientación``, ``Cálculo Zest``
+y de la cadena V2 (``Cálculo distancias reducidas v2`` + ``Cálculo coord
+aproximadas v2``; los mismos que ya usan ``test_station_position`` y
+``test_approximate_coordinate``).
 
 El fichero ``20260121_150005_*`` es una sola jornada (1 estacionamiento, 18
 puntos en cara directa + inversa); sus promedios Bessel reproducen los inputs
@@ -67,8 +68,9 @@ EXPECTED_ETR_Y = 4584084.29001
 EXPECTED_K_UTM = 0.99966334542276292
 EXPECTED_ETR_Z = 49.898617372443816
 EXPECTED_DESORIENTACION = 235.33841324540853
-# Coordenada aproximada (radiada) de C55-R-01E-C (Excel "Cálculo coord aprox").
-EXPECTED_C55R01_APPROX = (428175.18828641786, 4584168.0478291241, 43.406845391716821)
+# Coordenada aproximada (radiada) de C55-R-01E-C con la cadena V2
+# ("distancias reducidas v2" + "coord aproximadas v2"; i=m=0 en el GKA C56).
+EXPECTED_C55R01_APPROX = (428175.2287334801, 4584168.00531, 43.406845391716821)
 
 
 def _setup_c56(auth_client) -> dict:
@@ -149,6 +151,7 @@ class TestE2EC56Excel:
         station = get_station(auth_client, station_id)
         approx = {a["target_name"]: a for a in get_approx(auth_client, station_id)}
         bessel = get_bessel(auth_client, station_id)
+        raw = get_raw_observations(auth_client, station_id)
 
         # 18 puntos radiados (15 referencias + 3 controles).
         assert len(approx) == 18
@@ -161,7 +164,11 @@ class TestE2EC56Excel:
         assert c55["z"] == pytest.approx(EXPECTED_C55R01_APPROX[2], abs=0.02)
 
         # Recálculo independiente de la radiación usando los escalares del propio
-        # estacionamiento (etr, k_utm, desorientación) y las observaciones Bessel.
+        # estacionamiento (etr, k_utm, desorientación), las observaciones Bessel
+        # y las alturas i/m (0.0 en el GKA C56).
+        th_by: dict[str, float] = {}
+        for o in raw:
+            th_by.setdefault(o["target_name"], o.get("target_height") or 0.0)
         expected = recompute_radiation(
             bessel,
             etr_x=station["etr_x"],
@@ -169,6 +176,8 @@ class TestE2EC56Excel:
             etr_z=station["etr_z"],
             k_utm=station["k_utm"],
             desorientacion=station["desorientacion"],
+            instrument_height=station.get("station_height") or 0.0,
+            target_height_by_name=th_by,
         )
         for name, (ex, ey, ez) in expected.items():
             got = approx[name]

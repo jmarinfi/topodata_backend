@@ -418,6 +418,10 @@ Disparado por `POST /api/v1/station-setups/{id}/approximate-coordinates` o direc
 
 6. Radiación → list[RadiacionResult] (target_name, x, y, z, dist_utm, acimut, ...)
    ApproximateCoordinateCalculator.calculate_all_radiaciones(...)
+   Cadena V2 (Excel v2): reducción al horizonte con conversión cc→gon
+   —numerador v + (r−w)/10000, denominador w/20000; 1 gon = 10000 cc—,
+   luego elipsoide y plano UTM; la cota z lleva el término +i−m
+   (i = station_height, m = target_height de la primera obs cruda del objetivo)
 
 ─── Etapa 3: MMC ─────────────────────────────────────────────
 7. Capturar prec_by_target de ApproximateCoordinate previos

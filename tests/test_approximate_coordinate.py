@@ -173,16 +173,40 @@ def test_radiacion_c55_r01ec_oracle():
         kt_coef_refr=_KT_COEF_REFR,
     )
 
-    # Oracles del plan B2.6 (redondeados a 6 decimales en el Excel).
-    assert result.x == pytest.approx(428175.188286, abs=1e-4)
-    assert result.y == pytest.approx(4584168.047829, abs=1e-4)
+    # Oracles de los Excel v2 (fila 9, C55-R-01E-C).
+    assert result.x == pytest.approx(428175.228733, abs=1e-4)
+    assert result.y == pytest.approx(4584168.005310, abs=1e-4)
     assert result.z == pytest.approx(43.406845, abs=1e-4)
 
-    # Intermedios.
+    # Intermedios: cadena de reducción completa de "distancias reducidas v2".
     assert result.w_cc == pytest.approx(11.555028, abs=1e-4)
     assert result.r_cc == pytest.approx(1.502154, abs=1e-4)
-    assert result.dist_utm == pytest.approx(115.601264, abs=1e-4)
+    assert result.dist_hor == pytest.approx(115.582395, abs=1e-4)
+    assert result.dist_elip == pytest.approx(115.581490, abs=1e-4)
+    assert result.dist_utm == pytest.approx(115.542579, abs=1e-4)
     assert result.acimut == pytest.approx(351.589613, abs=1e-4)
+
+
+def test_radiacion_z_includes_instrument_and_target_height():
+    """La cota incorpora +i−m (Excel v2: +E9−F9)."""
+    bessel = _bessel_full("C55-R-01E-C", 116.2512, 103.5723, 115.7645)
+
+    result = ApproximateCoordinateCalculator.calculate_radiacion(
+        bessel=bessel,
+        etr_x=_ETR_X,
+        etr_y=_ETR_Y,
+        etr_z=_ETR_Z,
+        k_utm=_K_UTM,
+        desorientacion=_DESORIENTACION,
+        gon_r=GON_R,
+        earth_radius=_EARTH_RADIUS,
+        r_cc=_R_CC,
+        kt_coef_refr=_KT_COEF_REFR,
+        instrument_height=1.5,
+        target_height=0.25,
+    )
+
+    assert result.z == pytest.approx(44.656845, abs=1e-4)
 
 
 def test_radiacion_target_name_preserved():
