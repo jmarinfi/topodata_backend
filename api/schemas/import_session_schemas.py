@@ -17,8 +17,16 @@ class ImportSessionBase(BaseModel):
         description="Resumen hash del contenido del fichero",
     )
     raw_file_content: str = Field(..., description="Contenido del fichero")
-    prec_dist_mm: float = Field(default=0.8, gt=0, description="Precisión del distanciómetro (mm)")
-    prec_dist_ppm: float = Field(default=1, gt=0, description="Precisión del distanciómetro (ppm)")
+    kt_coef_refr: float = Field(
+        default=0.13, gt=0, description="Coeficiente de refracción"
+    )
+    prec_ang_etr: float = Field(default=0.5, gt=0, description="Precisión angular")
+    prec_dist_mm: float = Field(
+        default=0.8, gt=0, description="Precisión del distanciómetro (mm)"
+    )
+    prec_dist_ppm: float = Field(
+        default=1, gt=0, description="Precisión del distanciómetro (ppm)"
+    )
 
 
 class ImportSessionCreate(ImportSessionBase):
@@ -30,8 +38,7 @@ class ImportSessionCreate(ImportSessionBase):
 class ImportSessionUpdate(ImportSessionBase):
     """Esquema para actualizar sesiones de importación (PUT completo)."""
 
-    kt_coef_refr: float = Field(..., gt=0, description="Coeficiente de refracción")
-    prec_ang_etr: float = Field(..., gt=0, description="Precisión angular")
+    ...
 
 
 class ImportSessionResponse(ImportSessionBase):
