@@ -11,5 +11,5 @@ wheels/
 
 sqlite_database/
 .env
-.claude/*
+.claude/
 .pytest_cache
