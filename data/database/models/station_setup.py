@@ -30,6 +30,9 @@ class StationSetup(Base):
     k_utm: Mapped[float | None] = mapped_column(Float, nullable=True)
     desorientacion: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Orden de los puntos de control usados en el MMC
+    ls_obs_targets: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Matrices
     v_matrix: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     a_matrix: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
